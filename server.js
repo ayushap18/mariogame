@@ -8,6 +8,8 @@
  *   PORT           - Server port (default: 8080, Cloud Run sets this automatically)
  */
 
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';

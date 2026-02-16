@@ -64,6 +64,9 @@ class Game {
     // Star power state
     this._starTimer = 0;
 
+    // Retro background decorations (parallax clouds, hills, bushes)
+    this._bgDecorations = this._generateBackgroundDecorations();
+
     this._rafId = null;
     this._lastTime = 0;
     this._accumulator = 0;
@@ -548,6 +551,7 @@ class Game {
 
     if (!this.level) return;
 
+    this._renderBackground(ctx);
     this._renderTiles(ctx);
 
     for (const coin of this.coins) coin.render(ctx, this.camera);
@@ -588,6 +592,86 @@ class Game {
       ctx.restore();
     } else {
       this.player.render(ctx, this.camera);
+    }
+  }
+
+  _generateBackgroundDecorations() {
+    const decorations = { clouds: [], hills: [], bushes: [] };
+    // Generate clouds at varying heights and positions
+    for (let i = 0; i < 8; i++) {
+      decorations.clouds.push({
+        x: i * 180 + Math.random() * 60,
+        y: 20 + Math.random() * 40,
+        w: 40 + Math.random() * 30,
+        h: 16 + Math.random() * 10,
+        speed: 0.15 + Math.random() * 0.1,
+      });
+    }
+    // Generate hills
+    for (let i = 0; i < 6; i++) {
+      decorations.hills.push({
+        x: i * 250 + Math.random() * 80,
+        w: 80 + Math.random() * 60,
+        h: 30 + Math.random() * 25,
+        color: i % 2 === 0 ? '#3CB371' : '#2E8B57',
+      });
+    }
+    // Generate small bushes
+    for (let i = 0; i < 10; i++) {
+      decorations.bushes.push({
+        x: i * 130 + Math.random() * 50,
+        w: 20 + Math.random() * 16,
+        h: 8 + Math.random() * 6,
+      });
+    }
+    return decorations;
+  }
+
+  _renderBackground(ctx) {
+    if (!this._bgDecorations) return;
+    const camX = this.camera.x;
+    const groundY = CANVAS_HEIGHT - 32;
+
+    // Hills (parallax 0.3x)
+    for (const hill of this._bgDecorations.hills) {
+      const hx = hill.x - camX * 0.3;
+      const hy = groundY - hill.h;
+      // Wrap around
+      const wrappedX = ((hx % (CANVAS_WIDTH + 300)) + CANVAS_WIDTH + 300) % (CANVAS_WIDTH + 300) - 150;
+      ctx.fillStyle = hill.color;
+      ctx.beginPath();
+      ctx.moveTo(wrappedX - hill.w / 2, groundY);
+      ctx.quadraticCurveTo(wrappedX - hill.w / 4, hy, wrappedX, hy - 5);
+      ctx.quadraticCurveTo(wrappedX + hill.w / 4, hy, wrappedX + hill.w / 2, groundY);
+      ctx.fill();
+    }
+
+    // Bushes (parallax 0.4x)
+    ctx.fillStyle = '#228B22';
+    for (const bush of this._bgDecorations.bushes) {
+      const bx = bush.x - camX * 0.4;
+      const wrappedX = ((bx % (CANVAS_WIDTH + 200)) + CANVAS_WIDTH + 200) % (CANVAS_WIDTH + 200) - 100;
+      const by = groundY - bush.h / 2;
+      ctx.beginPath();
+      ctx.ellipse(wrappedX, by, bush.w / 2, bush.h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Clouds (parallax 0.2x, slightly animated)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (const cloud of this._bgDecorations.clouds) {
+      const cx = cloud.x - camX * 0.2 + this.frameCount * cloud.speed * 0.02;
+      const wrappedX = ((cx % (CANVAS_WIDTH + 300)) + CANVAS_WIDTH + 300) % (CANVAS_WIDTH + 300) - 150;
+      // Draw cloud as overlapping ellipses
+      ctx.beginPath();
+      ctx.ellipse(wrappedX, cloud.y, cloud.w / 2, cloud.h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(wrappedX - cloud.w * 0.25, cloud.y + 3, cloud.w * 0.3, cloud.h * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(wrappedX + cloud.w * 0.25, cloud.y + 2, cloud.w * 0.35, cloud.h * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
