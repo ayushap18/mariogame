@@ -254,7 +254,7 @@ class Game {
     }
 
     this.timer--;
-    if (this.timer <= 0) {
+    if (this.timer <= 0 && this.player.alive) {
       this.player.die();
       audioManager.death();
       this._announce('Time up!');
@@ -382,7 +382,7 @@ class Game {
       for (const enemy of this.enemies) {
         if (!enemy.alive) continue;
         if (!this.physics.checkEntityCollision(this.aiPlayer, enemy)) continue;
-        if (this.aiPlayer.vy > 0 && this.aiPlayer.y + this.aiPlayer.h - enemy.y < 10) {
+        if (this.aiPlayer.vy > 0 && this.aiPlayer.y + this.aiPlayer.h - enemy.y < 14) {
           enemy.stomp();
           this.aiPlayer.vy = -7;
           this.aiPlayer.addScore(200);

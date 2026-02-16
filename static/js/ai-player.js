@@ -32,6 +32,7 @@ class AIPlayer {
     this.frameCount = 0;
     this.deathTimer = 0;
     this._headHitCallbacks = [];
+    this._approachSpeed = 0;
   }
 
   onHeadHitBlock(callback) {
@@ -61,6 +62,10 @@ class AIPlayer {
       this.facing = -1;
     } else if (input.right) {
       this.vx = AI_MOVE_SPEED;
+      this.facing = 1;
+    } else if (this._approachSpeed > 0) {
+      // Controlled approach towards enemy
+      this.vx = this._approachSpeed;
       this.facing = 1;
     } else {
       this.vx *= FRICTION;
@@ -109,12 +114,24 @@ class AIPlayer {
       const nearestEnemy = this._findNearestEnemy(entities);
       if (nearestEnemy) {
         const dx = nearestEnemy.x - this.x;
-        if (dx > 0 && dx < 60 && this.onGround) {
-          input.jump = true;
+        if (dx > 0 && dx < 80) {
+          // Slow down when approaching enemy to line up stomp
+          input.right = false;
+          input.left = false;
+          this._approachSpeed = Math.max(0.8, dx / 40);
         }
-        if (dx < 0 && dx > -30) {
+        // Jump when close enough to land on the enemy (~20-35px)
+        if (dx > 0 && dx < 35 && this.onGround) {
           input.jump = true;
+          input.right = true;
         }
+        // Enemy behind - jump to avoid
+        if (dx < 0 && dx > -25) {
+          input.jump = true;
+          input.right = true;
+        }
+      } else {
+        this._approachSpeed = 0;
       }
 
       const nearestCoin = this._findNearestCoin(entities);
