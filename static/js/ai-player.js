@@ -45,7 +45,13 @@ class AIPlayer {
   }
 
   update(levelData, entities) {
-    if (!this.alive || this.finished) return null;
+    if (!this.alive) {
+      this.deathTimer++;
+      this.vy += 0.4;
+      this.y += this.vy;
+      return null;
+    }
+    if (this.finished) return null;
 
     this.frameCount++;
     const input = this._decide(levelData, entities);

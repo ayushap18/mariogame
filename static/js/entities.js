@@ -122,7 +122,7 @@ class Flag {
     this.x = x;
     this.y = y;
     this.w = 16;
-    this.h = 16;
+    this.h = 128;
     this.reached = false;
   }
 

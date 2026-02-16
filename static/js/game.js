@@ -64,6 +64,15 @@ class Game {
     // Star power state
     this._starTimer = 0;
 
+    // Combo system
+    this._comboCount = 0;
+    this._comboTimer = 0;
+    this._comboMultiplier = 1;
+
+    // Screen shake
+    this._shakeTimer = 0;
+    this._shakeIntensity = 0;
+
     // Retro background decorations (parallax clouds, hills, bushes)
     this._bgDecorations = this._generateBackgroundDecorations();
 
@@ -176,6 +185,21 @@ class Game {
       }
     }
 
+    // Combo timer decay
+    if (this._comboTimer > 0) {
+      this._comboTimer--;
+      if (this._comboTimer <= 0) {
+        this._comboCount = 0;
+        this._comboMultiplier = 1;
+      }
+    }
+
+    // Screen shake decay
+    if (this._shakeTimer > 0) {
+      this._shakeTimer--;
+      this._shakeIntensity *= 0.85;
+    }
+
     if (this.state === STATES.READY) {
       this.readyTimer--;
       if (this.readyTimer <= 0) {
@@ -244,6 +268,12 @@ class Game {
       if (this.aiPlayer.y > this.level.height + 32) {
         this.aiPlayer.die();
       }
+    } else if (this.aiPlayer && !this.aiPlayer.alive) {
+      // AI auto-respawn after death
+      this.aiPlayer.update(this.level.tiles, []);
+      if (this.aiPlayer.deathTimer > 60) {
+        this.aiPlayer.respawn(this.level.aiStart.x, this.level.aiStart.y);
+      }
     }
 
     for (const enemy of this.enemies) {
@@ -306,25 +336,26 @@ class Game {
 
       if (this.player.starPower) {
         enemy.stomp();
-        this.player.addScore(200);
-        this.stompCount++;
+        this._addComboStomp(enemy);
         audioManager.stomp();
-        this.floatingTexts.push(new FloatingText(enemy.x, enemy.y, '200', '#FFD700'));
+        this._triggerShake(3);
         continue;
       }
 
       if (this.player.vy > 0 && this.player.y + this.player.h - enemy.y < 14) {
         enemy.stomp();
         this.player.vy = -7;
-        this.player.addScore(200);
-        this.stompCount++;
+        this._addComboStomp(enemy);
         audioManager.stomp();
-        this.floatingTexts.push(new FloatingText(enemy.x, enemy.y, '200', '#FFFFFF'));
-        this._announce('Enemy stomped! 200 points');
+        this._triggerShake(4);
+        this._announce('Enemy stomped!');
         if (this.stompCount % 3 === 0) this._triggerCommentary('enemy_stomped');
       } else {
         if (this.player.die()) {
           this.deathCount++;
+          this._comboCount = 0;
+          this._comboTimer = 0;
+          this._comboMultiplier = 1;
           audioManager.death();
           this._announce('Hit by enemy!');
           this._triggerCommentary('death');
@@ -465,7 +496,33 @@ class Game {
       this.level.tiles[row][col] = '.';
       audioManager.blockHit();
       this.particles.push(...createBrickParticles(col * TILE_SIZE, row * TILE_SIZE));
+      this._triggerShake(3);
     }
+  }
+
+  // Combo scoring system
+  _addComboStomp(enemy) {
+    this._comboCount++;
+    this._comboTimer = 120; // 2 second window to continue combo
+    this._comboMultiplier = Math.min(this._comboCount, 8);
+    const baseScore = 200;
+    const comboScore = baseScore * this._comboMultiplier;
+    this.player.addScore(comboScore);
+    this.stompCount++;
+
+    const color = this._comboMultiplier >= 4 ? '#FFD700' : this._comboMultiplier >= 2 ? '#FFA500' : '#FFFFFF';
+    const label = this._comboMultiplier > 1 ? `${comboScore} x${this._comboMultiplier}` : `${comboScore}`;
+    this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 8, label, color));
+
+    if (this._comboMultiplier >= 3) {
+      this._announce(`${this._comboMultiplier}x Combo! ${comboScore} points!`);
+    }
+  }
+
+  // Screen shake
+  _triggerShake(intensity) {
+    this._shakeTimer = 12;
+    this._shakeIntensity = intensity;
   }
 
   _nextLevel() {
@@ -551,6 +608,14 @@ class Game {
 
     if (!this.level) return;
 
+    // Apply screen shake
+    if (this._shakeTimer > 0) {
+      ctx.save();
+      const dx = (Math.random() - 0.5) * this._shakeIntensity * 2;
+      const dy = (Math.random() - 0.5) * this._shakeIntensity * 2;
+      ctx.translate(dx, dy);
+    }
+
     this._renderBackground(ctx);
     this._renderTiles(ctx);
 
@@ -569,6 +634,23 @@ class Game {
     this._renderHUD(ctx);
     this._renderCommentary(ctx);
     this._renderCRT(ctx);
+
+    // Restore screen shake transform
+    if (this._shakeTimer > 0) {
+      ctx.restore();
+    }
+
+    // Combo HUD overlay
+    if (this._comboMultiplier > 1 && this._comboTimer > 0) {
+      ctx.save();
+      const hue = (this.frameCount * 8) % 360;
+      ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = Math.min(1, this._comboTimer / 30);
+      ctx.fillText(`COMBO x${this._comboMultiplier}`, CANVAS_WIDTH / 2, 42);
+      ctx.restore();
+    }
 
     if (this.state === STATES.READY) this._renderOverlay(ctx, this.level.name, 'Get Ready!');
     if (this.state === STATES.PAUSED) this._renderOverlay(ctx, 'PAUSED', 'Press ESC to resume');
