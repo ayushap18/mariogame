@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARIO.AI - Unit Tests</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { color: #FBD000; font-size: 18px; }
+    .pass { color: #00A800; }
+    .fail { color: #E52521; }
+    .info { color: #5C94FC; }
+    .suite { margin: 16px 0; padding: 12px; border: 1px solid #333; }
+    .suite h2 { font-size: 14px; color: #FBD000; margin-bottom: 8px; }
+    .result { padding: 4px 0; font-size: 12px; }
+    #summary { margin-top: 20px; padding: 12px; border: 2px solid #333; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>MARIO.AI Unit Tests</h1>
+  <div id="output"></div>
+  <div id="summary"></div>
+
+  <script type="module">
+    import { runTests } from './tests.js';
+    runTests();
+  </script>
+</body>
+</html>

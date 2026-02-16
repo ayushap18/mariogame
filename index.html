@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MARIO.AI - A reimagined retro platformer with AI opponent mode and Google Gemini-powered game companion. Built with HTML5 Canvas and Google Cloud.">
+  <meta name="theme-color" content="#1a1a2e">
+
+  <!-- Security Headers -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <title>MARIO.AI - Retro Platformer Reimagined</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="static/css/style.css">
+
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
+
+  <!-- Firebase SDK -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Skip Navigation Link -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- User Authentication Area -->
+  <div class="user-area" role="region" aria-label="User account">
+    <img id="user-avatar" class="user-avatar" src="" alt="" hidden aria-hidden="true">
+    <span id="user-name" class="user-name" aria-live="polite"></span>
+    <button id="sign-in-btn" class="btn-auth" aria-label="Sign in with Google">SIGN IN</button>
+    <button id="sign-out-btn" class="btn-auth" hidden aria-label="Sign out">SIGN OUT</button>
+  </div>
+
+  <main id="main-content" class="dashboard" role="main">
+    <!-- Logo -->
+    <header class="logo" role="banner">
+      <h1>MARIO<span style="color: var(--accent-blue)">.AI</span></h1>
+      <p class="subtitle">RETRO PLATFORMER REIMAGINED WITH GEMINI AI</p>
+    </header>
+
+    <!-- Decorative pixel character -->
+    <div class="float-anim" aria-hidden="true" style="font-size: 32px; margin: 10px 0;">
+      &#x1F3AE;
+    </div>
+
+    <!-- Main Menu -->
+    <nav class="menu" role="navigation" aria-label="Main menu">
+      <button id="play-btn" class="menu-btn btn-play pixel-border" aria-label="Start solo game">
+        &#9654; PLAY SOLO
+      </button>
+      <button id="ai-btn" class="menu-btn btn-ai pixel-border" aria-label="Start game versus AI opponent">
+        &#129302; VS AI MODE
+      </button>
+      <button id="companion-btn" class="menu-btn btn-companion" aria-label="Open AI companion chat powered by Google Gemini">
+        &#9733; AI COMPANION
+      </button>
+      <button id="leaderboard-btn" class="menu-btn btn-leaderboard" aria-label="View leaderboard">
+        &#127942; LEADERBOARD
+      </button>
+      <button id="settings-btn" class="menu-btn btn-settings" aria-label="Open settings">
+        &#9881; SETTINGS
+      </button>
+    </nav>
+
+    <!-- AI Companion Chat Panel (Powered by Google Gemini) -->
+    <section id="companion-panel" class="panel companion-panel" hidden role="dialog" aria-labelledby="companion-title" aria-describedby="companion-desc">
+      <button id="close-companion" class="panel-close" aria-label="Close AI companion">&#10005;</button>
+      <h2 id="companion-title">AI COMPANION</h2>
+      <p id="companion-desc" class="panel-desc">Powered by Google Gemini. Ask for tips, strategies, or just chat!</p>
+      <div id="companion-messages" class="companion-messages" role="log" aria-live="polite" aria-label="Chat messages">
+        <div class="companion-msg companion-ai">Hi! I'm your AI game companion powered by Google Gemini. Ask me anything about MARIO.AI!</div>
+      </div>
+      <form id="companion-form" class="companion-input-area" aria-label="Send message to AI companion">
+        <label for="companion-input" class="sr-only">Your message</label>
+        <input id="companion-input" type="text" placeholder="Ask me anything..." maxlength="500" autocomplete="off" aria-label="Type your message">
+        <button type="submit" class="companion-send" aria-label="Send message">SEND</button>
+      </form>
+      <div id="companion-status" class="companion-status" aria-live="polite"></div>
+    </section>
+
+    <!-- Leaderboard Panel -->
+    <section id="leaderboard-panel" class="panel" hidden role="dialog" aria-labelledby="lb-title">
+      <button id="close-leaderboard" class="panel-close" aria-label="Close leaderboard">&#10005;</button>
+      <h2 id="lb-title">LEADERBOARD</h2>
+      <table class="leaderboard-table" aria-label="Top scores">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">NAME</th>
+            <th scope="col">SCORE</th>
+            <th scope="col">MODE</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+          <tr><td colspan="4" class="center">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Settings Panel -->
+    <section id="settings-panel" class="panel" hidden role="dialog" aria-labelledby="settings-title">
+      <button id="close-settings" class="panel-close" aria-label="Close settings">&#10005;</button>
+      <h2 id="settings-title">SETTINGS</h2>
+      <div class="settings-group">
+        <label>
+          VOLUME
+          <input id="volume-slider" type="range" min="0" max="100" value="30" aria-label="Volume level">
+        </label>
+        <label>
+          SOUND EFFECTS
+          <input id="sound-toggle" type="checkbox" checked aria-label="Toggle sound effects">
+        </label>
+        <label>
+          HIGH CONTRAST
+          <input id="high-contrast-toggle" type="checkbox" aria-label="Toggle high contrast mode">
+        </label>
+        <label>
+          REDUCED MOTION
+          <input id="reduced-motion-toggle" type="checkbox" aria-label="Toggle reduced motion">
+        </label>
+      </div>
+      <div class="controls-help" role="note">
+        <h3>CONTROLS</h3>
+        <dl class="controls-list">
+          <dt>Move</dt><dd>Arrow keys or WASD</dd>
+          <dt>Jump</dt><dd>Up / W / Space</dd>
+          <dt>Pause</dt><dd>ESC or P</dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Screen Reader Announcements -->
+    <div id="announcements" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <p>MARIO.AI &copy; 2025 | Built with HTML5 Canvas, Google Gemini AI &amp; Firebase</p>
+  </footer>
+
+  <!-- Dashboard Script -->
+  <script type="module" src="static/js/dashboard.js"></script>
+</body>
+</html>

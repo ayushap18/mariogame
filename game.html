@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MARIO.AI Game - Play the reimagined retro platformer with Gemini AI companion.">
+  <meta name="theme-color" content="#1a1a2e">
+
+  <!-- Security Headers -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <title>MARIO.AI - Playing</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="static/css/style.css">
+
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
+
+  <!-- Firebase SDK -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Skip Navigation -->
+  <a href="#game-canvas" class="skip-link">Skip to game</a>
+
+  <main class="game-container" role="main" aria-label="Game area">
+    <!-- Game Header -->
+    <header class="game-header">
+      <a href="index.html" class="game-title" aria-label="Return to main menu">&#8592; MARIO.AI</a>
+      <div class="game-controls">
+        <button id="pause-btn" aria-label="Pause game">PAUSE</button>
+        <button id="mute-btn" aria-label="Toggle sound">SOUND</button>
+        <button id="tip-btn" aria-label="Get AI tip from Gemini">AI TIP</button>
+        <button id="back-btn" aria-label="Return to menu" onclick="window.location.href='index.html'">MENU</button>
+      </div>
+    </header>
+
+    <!-- Game Canvas -->
+    <div class="canvas-wrapper pixel-border">
+      <canvas id="game-canvas" role="img" aria-label="Game screen - Use arrow keys or WASD to play" tabindex="0"></canvas>
+    </div>
+
+    <!-- Touch Controls (Mobile) -->
+    <div class="touch-controls" aria-label="Touch controls">
+      <div class="touch-dpad">
+        <button id="touch-left" class="touch-btn" aria-label="Move left">&#9664;</button>
+        <button id="touch-right" class="touch-btn" aria-label="Move right">&#9654;</button>
+      </div>
+      <button id="touch-jump" class="touch-btn" aria-label="Jump">&#9650;</button>
+    </div>
+
+    <!-- Score Display (Accessibility - readable version) -->
+    <div class="scoreboard" role="status" aria-label="Game statistics">
+      <div class="scoreboard-item">
+        <div class="scoreboard-label">SCORE</div>
+        <div id="score-display">0</div>
+      </div>
+      <div class="scoreboard-item">
+        <div class="scoreboard-label">COINS</div>
+        <div id="coins-display">0</div>
+      </div>
+      <div class="scoreboard-item">
+        <div class="scoreboard-label">LIVES</div>
+        <div id="lives-display">5</div>
+      </div>
+      <div class="scoreboard-item" id="ai-score-wrapper" hidden>
+        <div class="scoreboard-label">AI SCORE</div>
+        <div id="ai-score-display">0</div>
+      </div>
+    </div>
+
+    <!-- Gemini AI Tip Display -->
+    <div id="ai-tip-bar" class="ai-tip-bar" role="status" aria-live="polite" aria-label="AI game tip" hidden>
+      <span class="ai-tip-label">GEMINI TIP:</span>
+      <span id="ai-tip-text" class="ai-tip-text"></span>
+      <button id="ai-tip-close" class="ai-tip-close" aria-label="Dismiss tip">&#10005;</button>
+    </div>
+
+    <!-- Screen Reader Game Announcements -->
+    <div id="game-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  </main>
+
+  <script type="module">
+    import { Game } from './static/js/game.js';
+    import { audioManager } from './static/js/audio.js';
+    import { initFirebase, trackPageView } from './static/js/services.js';
+    import { isGeminiAvailable, buildContext, getGameTip } from './static/js/gemini.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      initFirebase();
+      trackPageView('game');
+
+      const canvas = document.getElementById('game-canvas');
+      const params = new URLSearchParams(window.location.search);
+      const aiMode = params.get('mode') === 'ai';
+
+      if (aiMode) {
+        const aiWrapper = document.getElementById('ai-score-wrapper');
+        if (aiWrapper) aiWrapper.hidden = false;
+      }
+
+      const game = new Game(canvas, { aiMode });
+
+      const announcer = document.getElementById('game-announcements');
+      game.setAnnouncer(announcer);
+
+      canvas.focus();
+      game.start();
+
+      // Check Gemini availability and show/hide tip button
+      const geminiReady = await isGeminiAvailable();
+      const tipBtn = document.getElementById('tip-btn');
+      if (!geminiReady && tipBtn) {
+        tipBtn.style.display = 'none';
+      }
+
+      // AI Tip functionality
+      let tipCooldown = false;
+      async function requestTip() {
+        if (tipCooldown || !geminiReady) return;
+        tipCooldown = true;
+        if (tipBtn) tipBtn.textContent = '...';
+
+        const context = buildContext(
+          game.player,
+          game.currentLevel + 1,
+          Math.floor((game.timer || 0) / 60),
+          aiMode ? 'ai' : 'solo',
+          game.deathCount || 0,
+          game.stompCount || 0
+        );
+
+        const tip = await getGameTip(context);
+        const tipBar = document.getElementById('ai-tip-bar');
+        const tipText = document.getElementById('ai-tip-text');
+
+        if (tip && tipBar && tipText) {
+          tipText.textContent = tip;
+          tipBar.hidden = false;
+        }
+
+        if (tipBtn) tipBtn.textContent = 'AI TIP';
+        setTimeout(() => { tipCooldown = false; }, 10000);
+      }
+
+      tipBtn?.addEventListener('click', requestTip);
+
+      document.getElementById('ai-tip-close')?.addEventListener('click', () => {
+        const tipBar = document.getElementById('ai-tip-bar');
+        if (tipBar) tipBar.hidden = true;
+      });
+
+      // Accessible score updates
+      setInterval(() => {
+        if (game.player) {
+          const sd = document.getElementById('score-display');
+          const cd = document.getElementById('coins-display');
+          const ld = document.getElementById('lives-display');
+          if (sd) sd.textContent = game.player.score;
+          if (cd) cd.textContent = game.player.coins;
+          if (ld) ld.textContent = game.player.lives;
+        }
+        if (game.aiPlayer) {
+          const ad = document.getElementById('ai-score-display');
+          if (ad) ad.textContent = game.aiPlayer.score;
+        }
+      }, 500);
+
+      // Button bindings
+      document.getElementById('pause-btn')?.addEventListener('click', () => {
+        if (game.input) {
+          game.input.justPressed['Escape'] = true;
+        }
+      });
+
+      document.getElementById('mute-btn')?.addEventListener('click', () => {
+        const enabled = audioManager.toggle();
+        const btn = document.getElementById('mute-btn');
+        if (btn) btn.textContent = enabled ? 'SOUND' : 'MUTED';
+      });
+
+      // Touch controls
+      const touchLeft = document.getElementById('touch-left');
+      const touchRight = document.getElementById('touch-right');
+      const touchJump = document.getElementById('touch-jump');
+      game.input.bindTouchControls(touchLeft, touchRight, touchJump);
+
+      // Accessibility preferences from localStorage
+      if (localStorage.getItem('highContrast') === 'true') {
+        document.body.classList.add('high-contrast');
+      }
+      if (localStorage.getItem('reducedMotion') === 'true') {
+        document.body.classList.add('reduced-motion');
+      }
+
+      // Resume audio context on first interaction
+      document.addEventListener('click', () => audioManager.resume(), { once: true });
+      document.addEventListener('keydown', () => audioManager.resume(), { once: true });
+    });
+  </script>
+</body>
+</html>
