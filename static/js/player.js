@@ -28,6 +28,7 @@ class Player {
     this.invincibleTimer = 0;
     this.deathTimer = 0;
     this.finished = false;
+    this.starPower = false;
     this._headHitCallbacks = [];
   }
 
@@ -79,7 +80,7 @@ class Player {
   }
 
   die() {
-    if (this.invincibleTimer > 0) return false;
+    if (this.invincibleTimer > 0 || this.starPower) return false;
     this.alive = false;
     this.vy = -8;
     this.vx = 0;
@@ -96,6 +97,7 @@ class Player {
     this.deathTimer = 0;
     this.invincibleTimer = 120;
     this.finished = false;
+    this.starPower = false;
   }
 
   addScore(points) {

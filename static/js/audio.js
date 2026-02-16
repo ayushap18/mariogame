@@ -104,6 +104,18 @@ class AudioManager {
     });
   }
 
+  star() {
+    const notes = [784, 988, 1175, 1319, 1568, 1760, 1976, 2093];
+    notes.forEach((freq, i) => {
+      setTimeout(() => this._playTone(freq, 0.08, 'square', 0.25), i * 60);
+    });
+  }
+
+  voiceReady() {
+    this._playTone(880, 0.06, 'sine', 0.2);
+    setTimeout(() => this._playTone(1100, 0.08, 'sine', 0.2), 70);
+  }
+
   menuSelect() {
     this._playTone(660, 0.08, 'square', 0.2);
   }

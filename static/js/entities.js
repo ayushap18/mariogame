@@ -228,4 +228,110 @@ function createBrickParticles(x, y) {
   return particles;
 }
 
-export { Enemy, Coin, Flag, FloatingText, Particle, createBrickParticles };
+class Mushroom {
+  constructor(x, y) {
+    this.type = 'mushroom';
+    this.x = x;
+    this.y = y;
+    this.w = 14;
+    this.h = 14;
+    this.vx = 1.5;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.collected = false;
+    this.spawnTimer = 0;
+    this.spawnY = y;
+  }
+
+  update() {
+    if (!this.active || this.collected) return;
+    this.spawnTimer++;
+    if (this.spawnTimer < 16) {
+      this.y = this.spawnY - this.spawnTimer;
+      return;
+    }
+    this.x += this.vx;
+  }
+
+  collect() {
+    this.collected = true;
+    this.active = false;
+  }
+
+  render(ctx, camera) {
+    if (!this.active || this.collected) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    const sprite = renderSprite('mushroom', 1);
+    if (sprite) ctx.drawImage(sprite, drawX, drawY);
+  }
+}
+
+class StarPowerup {
+  constructor(x, y) {
+    this.type = 'star';
+    this.x = x;
+    this.y = y;
+    this.w = 14;
+    this.h = 14;
+    this.vx = 2;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.collected = false;
+    this.spawnTimer = 0;
+    this.spawnY = y;
+    this.animTimer = 0;
+  }
+
+  update() {
+    if (!this.active || this.collected) return;
+    this.spawnTimer++;
+    if (this.spawnTimer < 16) {
+      this.y = this.spawnY - this.spawnTimer;
+      return;
+    }
+    this.x += this.vx;
+    this.animTimer++;
+  }
+
+  collect() {
+    this.collected = true;
+    this.active = false;
+  }
+
+  render(ctx, camera) {
+    if (!this.active || this.collected) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    const twinkle = Math.floor(this.animTimer / 4) % 2 === 0;
+    const sprite = renderSprite('star_powerup', 1);
+    if (sprite) {
+      ctx.save();
+      if (twinkle) ctx.globalAlpha = 0.7;
+      ctx.drawImage(sprite, drawX, drawY);
+      ctx.restore();
+    }
+  }
+}
+
+function createPowerupParticles(x, y, color) {
+  const particles = [];
+  const colors = color === 'star'
+    ? ['#FFD700', '#FFFF00', '#FFA500', '#FFFFFF']
+    : ['#E52521', '#FFFFFF', '#FDB294'];
+  for (let i = 0; i < 12; i++) {
+    particles.push(new Particle(
+      x + Math.random() * 16,
+      y + Math.random() * 8,
+      (Math.random() - 0.5) * 5,
+      -Math.random() * 4 - 2,
+      colors[Math.floor(Math.random() * colors.length)],
+      35
+    ));
+  }
+  return particles;
+}
+
+export { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup, createBrickParticles, createPowerupParticles };

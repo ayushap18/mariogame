@@ -46,7 +46,9 @@
       <div class="game-controls">
         <button id="pause-btn" aria-label="Pause game">PAUSE</button>
         <button id="mute-btn" aria-label="Toggle sound">SOUND</button>
+        <button id="voice-btn" class="voice-btn-off" aria-label="Toggle AI voice helper">VOICE</button>
         <button id="tip-btn" aria-label="Get AI tip from Gemini">AI TIP</button>
+        <button id="strategy-btn" aria-label="Get AI strategy analysis">STRATEGY</button>
         <button id="back-btn" aria-label="Return to menu" onclick="window.location.href='index.html'">MENU</button>
       </div>
     </header>
@@ -99,6 +101,7 @@
   <script type="module">
     import { Game } from './static/js/game.js';
     import { audioManager } from './static/js/audio.js';
+    import { voiceHelper } from './static/js/voice.js';
     import { initFirebase, trackPageView } from './static/js/services.js';
     import { isGeminiAvailable, buildContext, getGameTip } from './static/js/gemini.js';
 
@@ -153,6 +156,7 @@
         if (tip && tipBar && tipText) {
           tipText.textContent = tip;
           tipBar.hidden = false;
+          voiceHelper.speakTip(tip);
         }
 
         if (tipBtn) tipBtn.textContent = 'AI TIP';
@@ -194,6 +198,48 @@
         const btn = document.getElementById('mute-btn');
         if (btn) btn.textContent = enabled ? 'SOUND' : 'MUTED';
       });
+
+      // Voice helper toggle
+      const voiceBtn = document.getElementById('voice-btn');
+      if (voiceHelper.available) {
+        if (voiceHelper.enabled && voiceBtn) {
+          voiceBtn.textContent = 'VOICE ON';
+          voiceBtn.className = 'voice-btn-on';
+        }
+        voiceBtn?.addEventListener('click', () => {
+          const on = voiceHelper.toggle();
+          if (voiceBtn) {
+            voiceBtn.textContent = on ? 'VOICE ON' : 'VOICE';
+            voiceBtn.className = on ? 'voice-btn-on' : 'voice-btn-off';
+          }
+          audioManager.voiceReady();
+        });
+      } else if (voiceBtn) {
+        voiceBtn.style.display = 'none';
+      }
+
+      // Strategy analysis
+      const strategyBtn = document.getElementById('strategy-btn');
+      let strategyCooldown = false;
+      strategyBtn?.addEventListener('click', async () => {
+        if (strategyCooldown || !geminiReady) return;
+        strategyCooldown = true;
+        if (strategyBtn) strategyBtn.textContent = '...';
+
+        const analysis = await game.requestStrategy();
+        const tipBar = document.getElementById('ai-tip-bar');
+        const tipText = document.getElementById('ai-tip-text');
+        if (analysis && tipBar && tipText) {
+          tipText.textContent = analysis;
+          tipBar.hidden = false;
+        }
+
+        if (strategyBtn) strategyBtn.textContent = 'STRATEGY';
+        setTimeout(() => { strategyCooldown = false; }, 15000);
+      });
+      if (!geminiReady && strategyBtn) {
+        strategyBtn.style.display = 'none';
+      }
 
       // Touch controls
       const touchLeft = document.getElementById('touch-left');

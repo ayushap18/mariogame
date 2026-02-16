@@ -90,7 +90,7 @@ async function chatWithCompanion(message, context) {
 
 /**
  * Get AI commentary for a game event.
- * @param {string} event - Event type (level_complete, game_over, game_win, enemy_stomped, death)
+ * @param {string} event - Event type (level_complete, game_over, game_win, enemy_stomped, death, powerup_mushroom, powerup_star, coin_streak)
  * @param {object} context - Game context
  * @returns {Promise<string|null>} Commentary text or null
  */
@@ -109,4 +109,24 @@ async function getCommentary(event, context) {
   }
 }
 
-export { isGeminiAvailable, buildContext, getGameTip, chatWithCompanion, getCommentary };
+/**
+ * Get strategy analysis from Gemini AI.
+ * @param {object} context - Game context from buildContext()
+ * @returns {Promise<string|null>} Strategy analysis or null
+ */
+async function getStrategyAnalysis(context) {
+  try {
+    const res = await fetch('/api/gemini/strategy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.analysis || null;
+  } catch {
+    return null;
+  }
+}
+
+export { isGeminiAvailable, buildContext, getGameTip, chatWithCompanion, getCommentary, getStrategyAnalysis };

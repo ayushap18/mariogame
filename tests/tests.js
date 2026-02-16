@@ -8,7 +8,7 @@ import { parseLevel, getLevelCount } from '../static/js/levels.js';
 import { InputManager } from '../static/js/input.js';
 import { Player, MOVE_SPEED, JUMP_FORCE } from '../static/js/player.js';
 import { AIPlayer } from '../static/js/ai-player.js';
-import { Enemy, Coin, Flag, FloatingText, Particle } from '../static/js/entities.js';
+import { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup } from '../static/js/entities.js';
 import { sanitizeInput, sanitizeOutput } from '../static/js/services.js';
 import { isGeminiAvailable, buildContext } from '../static/js/gemini.js';
 
@@ -42,7 +42,7 @@ function suite(name, fn) {
   fn();
 }
 
-function runTests() {
+async function runTests() {
   // ---- AABB Tests ----
   suite('AABB Collision Detection', () => {
     const a = new AABB(0, 0, 10, 10);
@@ -458,6 +458,75 @@ function runTests() {
       'Should escape XSS img tag');
 
     assertEqual(sanitizeInput('a&b<c>d"e'), 'abcde', 'Should strip all special chars');
+  });
+
+  // ---- Power-up Entity Tests ----
+  suite('Mushroom Power-up', () => {
+    const m = new Mushroom(100, 100);
+    assertEqual(m.type, 'mushroom', 'Mushroom should have type "mushroom"');
+    assert(m.active, 'Mushroom should start active');
+    assert(!m.collected, 'Mushroom should start uncollected');
+    assertEqual(m.vx, 1.5, 'Mushroom should move right');
+
+    m.update();
+    assert(m.spawnTimer === 1, 'Spawn timer should increment');
+    assert(m.active, 'Mushroom should remain active during spawn');
+
+    m.collect();
+    assert(m.collected, 'Mushroom should be collected after collect()');
+    assert(!m.active, 'Mushroom should be inactive after collect()');
+  });
+
+  suite('Star Power-up', () => {
+    const s = new StarPowerup(200, 100);
+    assertEqual(s.type, 'star', 'Star should have type "star"');
+    assert(s.active, 'Star should start active');
+    assert(!s.collected, 'Star should start uncollected');
+    assertEqual(s.vx, 2, 'Star should move right at speed 2');
+
+    s.update();
+    assert(s.spawnTimer === 1, 'Star spawn timer should increment');
+
+    s.collect();
+    assert(s.collected, 'Star should be collected after collect()');
+    assert(!s.active, 'Star should be inactive after collect()');
+  });
+
+  // ---- Player Star Power Tests ----
+  suite('Player Star Power', () => {
+    const player = new Player(100, 100);
+    assertEqual(player.starPower, false, 'Player should start without star power');
+
+    player.starPower = true;
+    const died = player.die();
+    assert(!died, 'Player should not die while star power is active');
+    assert(player.alive, 'Player should remain alive with star power');
+
+    player.starPower = false;
+    const died2 = player.die();
+    assert(died2, 'Player should die when star power is off');
+    assert(!player.alive, 'Player should be dead');
+
+    player.respawn(100, 100);
+    assertEqual(player.starPower, false, 'Star power should reset on respawn');
+  });
+
+  // ---- Gemini Strategy Module Test ----
+  suite('Gemini Strategy Module', () => {
+    const { getStrategyAnalysis } = await import('../static/js/gemini.js');
+    assert(typeof getStrategyAnalysis === 'function', 'getStrategyAnalysis should be exported');
+  });
+
+  // ---- Voice Helper Module Test ----
+  suite('Voice Helper Module', () => {
+    const { VoiceHelper, voiceHelper } = await import('../static/js/voice.js');
+    assert(typeof VoiceHelper === 'function', 'VoiceHelper should be a class');
+    assert(voiceHelper !== null, 'voiceHelper singleton should exist');
+    assert(typeof voiceHelper.toggle === 'function', 'voiceHelper should have toggle method');
+    assert(typeof voiceHelper.speak === 'function', 'voiceHelper should have speak method');
+    assert(typeof voiceHelper.speakTip === 'function', 'voiceHelper should have speakTip method');
+    assert(typeof voiceHelper.speakCommentary === 'function', 'voiceHelper should have speakCommentary method');
+    assert(typeof voiceHelper.stop === 'function', 'voiceHelper should have stop method');
   });
 
   // ---- Render Results ----

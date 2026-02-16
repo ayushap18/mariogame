@@ -1,6 +1,7 @@
 /**
  * Main game controller. Manages the game loop, state transitions,
- * entity interactions, level progression, and rendering.
+ * entity interactions, level progression, rendering, AI commentary,
+ * voice helper integration, power-ups, and CRT retro effects.
  */
 
 import { Camera, PhysicsEngine, TILE_SIZE } from './engine.js';
@@ -9,9 +10,11 @@ import { InputManager } from './input.js';
 import { parseLevel, getLevelCount } from './levels.js';
 import { Player } from './player.js';
 import { AIPlayer } from './ai-player.js';
-import { Enemy, Coin, Flag, FloatingText, Particle, createBrickParticles } from './entities.js';
+import { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup, createBrickParticles, createPowerupParticles } from './entities.js';
 import { audioManager } from './audio.js';
+import { voiceHelper } from './voice.js';
 import { trackGameStart, trackLevelComplete, trackGameOver, submitScore, getUser } from './services.js';
+import { isGeminiAvailable, buildContext, getCommentary, getStrategyAnalysis } from './gemini.js';
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 224;
@@ -40,6 +43,8 @@ class Game {
     this.enemies = [];
     this.coins = [];
     this.flags = [];
+    this.mushrooms = [];
+    this.stars = [];
     this.floatingTexts = [];
     this.particles = [];
     this.timer = 0;
@@ -47,6 +52,17 @@ class Game {
     this.readyTimer = 90;
     this.deathCount = 0;
     this.stompCount = 0;
+    this.blockHitCount = 0;
+
+    // AI commentary overlay
+    this._commentaryText = '';
+    this._commentaryTimer = 0;
+    this._commentaryAlpha = 0;
+    this._commentaryCooldown = 0;
+    this._geminiReady = false;
+
+    // Star power state
+    this._starTimer = 0;
 
     this._rafId = null;
     this._lastTime = 0;
@@ -56,6 +72,9 @@ class Game {
     this._announcer = null;
 
     this.input.bind(document);
+
+    // Check Gemini availability
+    isGeminiAvailable().then(ok => { this._geminiReady = ok; });
   }
 
   setAnnouncer(el) {
@@ -99,6 +118,8 @@ class Game {
     this.enemies = [];
     this.coins = [];
     this.flags = [];
+    this.mushrooms = [];
+    this.stars = [];
     this.floatingTexts = [];
     this.particles = [];
     this.timer = data.time * 60;
@@ -137,6 +158,20 @@ class Game {
 
   _update() {
     this.frameCount++;
+
+    if (this._commentaryTimer > 0) {
+      this._commentaryTimer--;
+      this._commentaryAlpha = Math.min(1, this._commentaryTimer / 20);
+      if (this._commentaryTimer > 160) this._commentaryAlpha = Math.min(1, (180 - this._commentaryTimer) / 20);
+    }
+    if (this._commentaryCooldown > 0) this._commentaryCooldown--;
+
+    if (this._starTimer > 0) {
+      this._starTimer--;
+      if (this._starTimer <= 0 && this.player) {
+        this.player.starPower = false;
+      }
+    }
 
     if (this.state === STATES.READY) {
       this.readyTimer--;
@@ -195,6 +230,7 @@ class Game {
         this.player.die();
         audioManager.death();
         this._announce('You fell!');
+        this._triggerCommentary('death');
       }
     }
 
@@ -213,6 +249,22 @@ class Game {
       this.physics.resolveCollisions(enemy);
     }
 
+    // Update power-ups
+    for (const m of this.mushrooms) {
+      m.update();
+      if (m.spawnTimer >= 16 && m.active) {
+        this.physics.applyGravity(m);
+        this.physics.resolveCollisions(m);
+      }
+    }
+    for (const s of this.stars) {
+      s.update();
+      if (s.spawnTimer >= 16 && s.active) {
+        this.physics.applyGravity(s);
+        this.physics.resolveCollisions(s);
+      }
+    }
+
     this._checkCollisions();
 
     this.camera.follow(this.player);
@@ -224,6 +276,7 @@ class Game {
     if (!this.player.alive && this.player.deathTimer > 90) {
       if (this.player.lives > 0) {
         this.player.respawn(this.level.playerStart.x, this.level.playerStart.y);
+        this._starTimer = 0;
         if (this.aiPlayer) {
           this.aiPlayer.respawn(this.level.aiStart.x, this.level.aiStart.y);
         }
@@ -233,6 +286,7 @@ class Game {
         audioManager.gameOver();
         trackGameOver(this.player.score, this.currentLevel + 1, this.player.coins);
         this._announce('Game over! Press Enter to restart.');
+        this._triggerCommentary('game_over');
         this._submitHighScore();
       }
     }
@@ -247,6 +301,15 @@ class Game {
       if (!enemy.alive) continue;
       if (!this.physics.checkEntityCollision(this.player, enemy)) continue;
 
+      if (this.player.starPower) {
+        enemy.stomp();
+        this.player.addScore(200);
+        this.stompCount++;
+        audioManager.stomp();
+        this.floatingTexts.push(new FloatingText(enemy.x, enemy.y, '200', '#FFD700'));
+        continue;
+      }
+
       if (this.player.vy > 0 && this.player.y + this.player.h - enemy.y < 14) {
         enemy.stomp();
         this.player.vy = -7;
@@ -255,11 +318,13 @@ class Game {
         audioManager.stomp();
         this.floatingTexts.push(new FloatingText(enemy.x, enemy.y, '200', '#FFFFFF'));
         this._announce('Enemy stomped! 200 points');
+        if (this.stompCount % 3 === 0) this._triggerCommentary('enemy_stomped');
       } else {
         if (this.player.die()) {
           this.deathCount++;
           audioManager.death();
           this._announce('Hit by enemy!');
+          this._triggerCommentary('death');
         }
       }
     }
@@ -286,12 +351,48 @@ class Game {
         audioManager.coin();
         this.floatingTexts.push(new FloatingText(coin.x, coin.y, '100', '#FBD000'));
         this._announce(`Coin collected! Total: ${this.player.coins}`);
+        if (this.player.coins % 10 === 0) this._triggerCommentary('coin_streak');
       }
       if (this.aiPlayer && this.aiPlayer.alive && !coin.collected) {
         if (this.physics.checkEntityCollision(this.aiPlayer, coin)) {
           coin.collect();
           this.aiPlayer.addCoin();
         }
+      }
+    }
+
+    // Mushroom collisions
+    for (const m of this.mushrooms) {
+      if (!m.active || m.collected) continue;
+      if (m.spawnTimer < 16) continue;
+      if (this.physics.checkEntityCollision(this.player, m)) {
+        m.collect();
+        this.player.lives++;
+        this.player.addScore(1000);
+        audioManager.powerup();
+        this.floatingTexts.push(new FloatingText(m.x, m.y, '+1UP', '#00FF00'));
+        this.particles.push(...createPowerupParticles(m.x, m.y, 'mushroom'));
+        this._announce('Mushroom! Extra life!');
+        this._triggerCommentary('powerup_mushroom');
+        voiceHelper.speakCommentary('Power up! Extra life!');
+      }
+    }
+
+    // Star power-up collisions
+    for (const s of this.stars) {
+      if (!s.active || s.collected) continue;
+      if (s.spawnTimer < 16) continue;
+      if (this.physics.checkEntityCollision(this.player, s)) {
+        s.collect();
+        this.player.starPower = true;
+        this._starTimer = 600; // 10 seconds
+        this.player.addScore(2000);
+        audioManager.star();
+        this.floatingTexts.push(new FloatingText(s.x, s.y, 'STAR!', '#FFD700'));
+        this.particles.push(...createPowerupParticles(s.x, s.y, 'star'));
+        this._announce('Star power! Invincible for 10 seconds!');
+        this._triggerCommentary('powerup_star');
+        voiceHelper.speakCommentary('Star power activated! You are invincible!');
       }
     }
 
@@ -307,6 +408,8 @@ class Game {
 
         trackLevelComplete(this.currentLevel + 1, this.player.score, Math.floor(this.timer / 60));
 
+        this._triggerCommentary('level_complete');
+
         setTimeout(() => {
           if (this.currentLevel + 1 < getLevelCount()) {
             this.state = STATES.LEVEL_COMPLETE;
@@ -314,6 +417,7 @@ class Game {
           } else {
             this.state = STATES.WIN;
             this._announce(`You win! Final score: ${this.player.score}. Press Enter to play again.`);
+            this._triggerCommentary('game_win');
             this._submitHighScore();
           }
         }, 1500);
@@ -333,12 +437,26 @@ class Game {
 
     if (tile === '?') {
       this.level.tiles[row][col] = '=';
-      hitter.addScore(50);
-      hitter.addCoin();
-      audioManager.coin();
-      this.floatingTexts.push(new FloatingText(col * TILE_SIZE, row * TILE_SIZE - 10, '50', '#FBD000'));
+      this.blockHitCount++;
+
+      // Every 4th block gives mushroom, every 7th gives star
+      if (hitter === this.player && this.blockHitCount % 7 === 0) {
+        this.stars.push(new StarPowerup(col * TILE_SIZE, row * TILE_SIZE));
+        audioManager.blockHit();
+        this.floatingTexts.push(new FloatingText(col * TILE_SIZE, row * TILE_SIZE - 10, 'STAR', '#FFD700'));
+      } else if (hitter === this.player && this.blockHitCount % 4 === 0) {
+        this.mushrooms.push(new Mushroom(col * TILE_SIZE, row * TILE_SIZE));
+        audioManager.blockHit();
+        this.floatingTexts.push(new FloatingText(col * TILE_SIZE, row * TILE_SIZE - 10, '1-UP', '#00FF00'));
+      } else {
+        hitter.addScore(50);
+        hitter.addCoin();
+        audioManager.coin();
+        this.floatingTexts.push(new FloatingText(col * TILE_SIZE, row * TILE_SIZE - 10, '50', '#FBD000'));
+      }
+
       if (hitter === this.player) {
-        this._announce('Question block! 50 points and a coin');
+        this._announce('Question block hit!');
       }
     } else if (tile === 'B') {
       this.level.tiles[row][col] = '.';
@@ -357,6 +475,7 @@ class Game {
     this.player.lives = savedLives;
     this.state = STATES.READY;
     this.readyTimer = 90;
+    this._starTimer = 0;
     this._announce(`${this.level.name}. Get ready!`);
   }
 
@@ -364,6 +483,8 @@ class Game {
     this.loadLevel(0);
     this.state = STATES.READY;
     this.readyTimer = 90;
+    this.blockHitCount = 0;
+    this._starTimer = 0;
     this._announce('Game restarted. Get ready!');
   }
 
@@ -379,6 +500,46 @@ class Game {
     }
   }
 
+  // AI commentary system
+  async _triggerCommentary(event) {
+    if (!this._geminiReady) return;
+    if (this._commentaryCooldown > 0) return;
+    this._commentaryCooldown = 300; // 5 second cooldown
+
+    const context = buildContext(
+      this.player,
+      this.currentLevel + 1,
+      Math.floor((this.timer || 0) / 60),
+      this.aiMode ? 'ai' : 'solo',
+      this.deathCount,
+      this.stompCount
+    );
+
+    const text = await getCommentary(event, context);
+    if (text) {
+      this._commentaryText = text;
+      this._commentaryTimer = 180; // 3 seconds display
+      voiceHelper.speakCommentary(text);
+    }
+  }
+
+  async requestStrategy() {
+    if (!this._geminiReady) return null;
+    const context = buildContext(
+      this.player,
+      this.currentLevel + 1,
+      Math.floor((this.timer || 0) / 60),
+      this.aiMode ? 'ai' : 'solo',
+      this.deathCount,
+      this.stompCount
+    );
+    const analysis = await getStrategyAnalysis(context);
+    if (analysis) {
+      voiceHelper.speakStrategy(analysis);
+    }
+    return analysis;
+  }
+
   _render() {
     const ctx = this.ctx;
 
@@ -392,20 +553,42 @@ class Game {
     for (const coin of this.coins) coin.render(ctx, this.camera);
     for (const flag of this.flags) flag.render(ctx, this.camera);
     for (const enemy of this.enemies) enemy.render(ctx, this.camera);
+    for (const m of this.mushrooms) m.render(ctx, this.camera);
+    for (const s of this.stars) s.render(ctx, this.camera);
 
     if (this.aiPlayer) this.aiPlayer.render(ctx, this.camera);
-    if (this.player) this.player.render(ctx, this.camera);
+    if (this.player) this._renderPlayer(ctx);
 
     for (const ft of this.floatingTexts) ft.render(ctx, this.camera);
     for (const p of this.particles) p.render(ctx, this.camera);
 
     this._renderHUD(ctx);
+    this._renderCommentary(ctx);
+    this._renderCRT(ctx);
 
     if (this.state === STATES.READY) this._renderOverlay(ctx, this.level.name, 'Get Ready!');
     if (this.state === STATES.PAUSED) this._renderOverlay(ctx, 'PAUSED', 'Press ESC to resume');
     if (this.state === STATES.LEVEL_COMPLETE) this._renderOverlay(ctx, 'LEVEL CLEAR!', 'Press ENTER to continue');
     if (this.state === STATES.GAME_OVER) this._renderOverlay(ctx, 'GAME OVER', `Score: ${this.player.score} | Press ENTER`);
     if (this.state === STATES.WIN) this._renderOverlay(ctx, 'YOU WIN!', `Final Score: ${this.player.score} | Press ENTER`);
+  }
+
+  _renderPlayer(ctx) {
+    if (!this.player) return;
+    // Rainbow flash effect during star power
+    if (this.player.starPower && this._starTimer > 0) {
+      this.player.render(ctx, this.camera);
+      ctx.save();
+      const hue = (this.frameCount * 15) % 360;
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+      const drawX = Math.round(this.player.x - this.camera.x);
+      const drawY = Math.round(this.player.y - this.camera.y);
+      ctx.fillRect(drawX, drawY, this.player.w, this.player.h);
+      ctx.restore();
+    } else {
+      this.player.render(ctx, this.camera);
+    }
   }
 
   _renderTiles(ctx) {
@@ -463,6 +646,62 @@ class Game {
       ctx.fillStyle = '#88CCFF';
       ctx.fillText(`AI: ${this.aiPlayer.score.toString().padStart(6, '0')}`, 8, 32);
     }
+
+    // Star power indicator
+    if (this._starTimer > 0) {
+      ctx.textAlign = 'center';
+      const hue = (this.frameCount * 10) % 360;
+      ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+      ctx.fillText(`STAR ${Math.ceil(this._starTimer / 60)}s`, CANVAS_WIDTH / 2, 32);
+    }
+  }
+
+  _renderCommentary(ctx) {
+    if (this._commentaryTimer <= 0 || !this._commentaryText) return;
+
+    ctx.save();
+    ctx.globalAlpha = this._commentaryAlpha * 0.9;
+
+    // Background bar
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, CANVAS_HEIGHT - 28, CANVAS_WIDTH, 28);
+
+    // AI label
+    ctx.fillStyle = '#88CCFF';
+    ctx.font = 'bold 6px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('GEMINI AI:', 6, CANVAS_HEIGHT - 16);
+
+    // Commentary text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '6px monospace';
+    ctx.fillText(this._commentaryText.substring(0, 60), 60, CANVAS_HEIGHT - 16);
+    if (this._commentaryText.length > 60) {
+      ctx.fillText(this._commentaryText.substring(60, 120), 6, CANVAS_HEIGHT - 6);
+    }
+
+    ctx.restore();
+  }
+
+  _renderCRT(ctx) {
+    // Subtle CRT scanline effect
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = '#000000';
+    for (let y = 0; y < CANVAS_HEIGHT; y += 3) {
+      ctx.fillRect(0, y, CANVAS_WIDTH, 1);
+    }
+    // Slight vignette
+    const gradient = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.35,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.7
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.restore();
   }
 
   _renderOverlay(ctx, title, subtitle) {
@@ -481,6 +720,7 @@ class Game {
   destroy() {
     if (this._rafId) cancelAnimationFrame(this._rafId);
     this.input.destroy();
+    voiceHelper.stop();
   }
 }
 

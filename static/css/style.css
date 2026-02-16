@@ -324,15 +324,7 @@ input:focus-visible {
 
 .game-controls button:hover { background: var(--accent-blue); }
 
-.canvas-wrapper {
-  position: relative;
-  width: 100%;
-  max-width: 800px;
-  aspect-ratio: 400 / 224;
-  background: #000;
-  border: 3px solid var(--border-color);
-  image-rendering: pixelated;
-}
+/* canvas-wrapper is defined in the CRT section below */
 
 #game-canvas {
   display: block;
@@ -638,6 +630,67 @@ input:focus-visible {
 
 .ai-tip-close:hover {
   color: var(--text-accent);
+}
+
+/* ---------- Voice Button ---------- */
+.voice-btn-off {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+
+.voice-btn-on {
+  background: #9C27B0 !important;
+  border-color: #6A1B9A !important;
+  color: #fff !important;
+}
+
+.voice-btn-on::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00FF00;
+  margin-right: 4px;
+  animation: voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ---------- CRT Overlay Effect (CSS complement to canvas) ---------- */
+.canvas-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 400 / 224;
+  background: #000;
+  border: 3px solid var(--border-color);
+  image-rendering: pixelated;
+  box-shadow:
+    0 0 20px rgba(92, 148, 252, 0.15),
+    inset 0 0 60px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.08) 0px,
+    rgba(0, 0, 0, 0.08) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
 }
 
 /* ---------- Controls Help (Settings) ---------- */

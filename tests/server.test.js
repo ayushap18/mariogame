@@ -106,12 +106,18 @@ describe('Game Context Validation', () => {
 
 // --- Valid Events Tests ---
 describe('Event Validation', () => {
-  const validEvents = ['level_complete', 'game_over', 'game_win', 'enemy_stomped', 'death'];
+  const validEvents = ['level_complete', 'game_over', 'game_win', 'enemy_stomped', 'death', 'powerup_mushroom', 'powerup_star', 'coin_streak'];
 
   test('accepts all valid event types', () => {
     for (const event of validEvents) {
       assert.ok(validEvents.includes(event), `${event} should be valid`);
     }
+  });
+
+  test('accepts new power-up events', () => {
+    assert.ok(validEvents.includes('powerup_mushroom'), 'powerup_mushroom should be valid');
+    assert.ok(validEvents.includes('powerup_star'), 'powerup_star should be valid');
+    assert.ok(validEvents.includes('coin_streak'), 'coin_streak should be valid');
   });
 
   test('rejects invalid event types', () => {

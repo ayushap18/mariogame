@@ -214,7 +214,7 @@ app.post('/api/gemini/commentary', rateLimit, async (req, res) => {
     return res.status(400).json({ error: 'Event and context are required.' });
   }
 
-  const validEvents = ['level_complete', 'game_over', 'game_win', 'enemy_stomped', 'death'];
+  const validEvents = ['level_complete', 'game_over', 'game_win', 'enemy_stomped', 'death', 'powerup_mushroom', 'powerup_star', 'coin_streak'];
   if (!validEvents.includes(event)) {
     return res.status(400).json({ error: 'Invalid event type.' });
   }
@@ -234,6 +234,51 @@ Be dramatic, fun, and retro-gaming themed. Use exclamation marks. Examples of go
   } catch (err) {
     console.error('Gemini commentary error:', err.message);
     res.status(500).json({ error: 'Failed to generate commentary.' });
+  }
+});
+
+/**
+ * POST /api/gemini/strategy
+ * Get detailed strategy analysis for the player's performance.
+ */
+app.post('/api/gemini/strategy', rateLimit, async (req, res) => {
+  if (!geminiModel) {
+    return res.status(503).json({ error: 'AI service not available.' });
+  }
+
+  const context = validateGameContext(req.body.context);
+  if (!context) {
+    return res.status(400).json({ error: 'Invalid game context.' });
+  }
+
+  try {
+    const prompt = `You are an expert game strategy analyst for MARIO.AI, a retro platformer. Analyze the player's performance and give a brief assessment.
+
+Player stats:
+- Score: ${context.score}
+- Level: World 1-${context.level}
+- Lives: ${context.lives}
+- Coins: ${context.coins}
+- Deaths: ${context.deaths}
+- Enemies stomped: ${context.enemiesStomped}
+- Time remaining: ${context.timeRemaining}s
+- Mode: ${context.mode === 'ai' ? 'VS AI opponent' : 'Solo'}
+
+Provide a brief analysis in this exact format (keep each line under 15 words):
+RATING: [Beginner/Intermediate/Advanced/Expert]
+STRENGTH: [One thing they're doing well]
+IMPROVE: [One thing to improve]
+NEXT TIP: [One actionable tip for their next move]
+
+Be encouraging and retro-gaming themed.`;
+
+    const result = await geminiModel.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    res.json({ analysis: text });
+  } catch (err) {
+    console.error('Gemini strategy error:', err.message);
+    res.status(500).json({ error: 'Failed to generate strategy.' });
   }
 });
 

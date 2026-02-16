@@ -288,6 +288,27 @@ const SPRITE_DATA = {
       '................',
     ],
   },
+  star_powerup: {
+    palette: 'world',
+    pixels: [
+      '......yyyy......',
+      '......yyyy......',
+      '.....yyyyyy.....',
+      '....yyyyyyyy....',
+      'yyyyyyyyyyyyyyyy',
+      '.yyyyyyyyyyyyyyo',
+      '..yyyyyyyyyyyy..',
+      '...yyyyyyyyyy...',
+      '..yyyyyy.yyyyy..',
+      '.yyyyy...oyyyyy.',
+      '.yyyy.....yyyyy.',
+      'yyyy.......yyyy.',
+      '................',
+      '................',
+      '................',
+      '................',
+    ],
+  },
   used_block: {
     palette: 'world',
     pixels: [

@@ -6,6 +6,7 @@
 
 import { initFirebase, signInWithGoogle, signOut, getUser, getLeaderboard, trackPageView, trackEvent } from './services.js';
 import { audioManager } from './audio.js';
+import { voiceHelper } from './voice.js';
 import { isGeminiAvailable, chatWithCompanion } from './gemini.js';
 
 class Dashboard {
@@ -46,6 +47,7 @@ class Dashboard {
     this.soundToggle = document.getElementById('sound-toggle');
     this.highContrastToggle = document.getElementById('high-contrast-toggle');
     this.reducedMotionToggle = document.getElementById('reduced-motion-toggle');
+    this.voiceToggle = document.getElementById('voice-toggle');
   }
 
   _bindEvents() {
@@ -78,6 +80,12 @@ class Dashboard {
       document.body.classList.toggle('reduced-motion', e.target.checked);
       localStorage.setItem('reducedMotion', e.target.checked);
     });
+    this.voiceToggle?.addEventListener('change', () => {
+      voiceHelper.toggle();
+      if (voiceHelper.enabled) {
+        voiceHelper.speak('AI voice helper activated!');
+      }
+    });
 
     if (localStorage.getItem('highContrast') === 'true') {
       document.body.classList.add('high-contrast');
@@ -86,6 +94,9 @@ class Dashboard {
     if (localStorage.getItem('reducedMotion') === 'true') {
       document.body.classList.add('reduced-motion');
       if (this.reducedMotionToggle) this.reducedMotionToggle.checked = true;
+    }
+    if (voiceHelper.enabled && this.voiceToggle) {
+      this.voiceToggle.checked = true;
     }
 
     this.playBtn?.addEventListener('keydown', (e) => {
@@ -227,6 +238,7 @@ class Dashboard {
 
     if (reply) {
       this._addCompanionMessage(reply, 'ai');
+      voiceHelper.speakCommentary(reply);
     } else {
       this._addCompanionMessage('Sorry, I could not respond. Please try again later.', 'ai');
     }
