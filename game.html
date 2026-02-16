@@ -94,8 +94,21 @@
       <button id="ai-tip-close" class="ai-tip-close" aria-label="Dismiss tip">&#10005;</button>
     </div>
 
+    <!-- Social Sharing -->
+    <div class="share-bar" role="region" aria-label="Share your score on social media">
+      <span class="share-label">SHARE SCORE:</span>
+      <button id="share-x" class="share-btn share-x" aria-label="Share score on X (Twitter)" title="Share on X">&#120143;</button>
+      <button id="share-linkedin" class="share-btn share-linkedin" aria-label="Share score on LinkedIn" title="Share on LinkedIn">in</button>
+      <button id="share-instagram" class="share-btn share-instagram" aria-label="Copy score for Instagram" title="Copy for Instagram">&#128247;</button>
+    </div>
+
     <!-- Screen Reader Game Announcements -->
     <div id="game-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Keyboard Shortcuts (Screen Reader) -->
+    <div class="sr-only" role="note" aria-label="Keyboard shortcuts">
+      Arrow keys or WASD to move. Up arrow, W, or Space to jump. Escape or P to pause. Enter to confirm.
+    </div>
   </main>
 
   <script type="module">
@@ -112,13 +125,14 @@
       const canvas = document.getElementById('game-canvas');
       const params = new URLSearchParams(window.location.search);
       const aiMode = params.get('mode') === 'ai';
+      const timeAttack = params.get('mode') === 'timeattack';
 
       if (aiMode) {
         const aiWrapper = document.getElementById('ai-score-wrapper');
         if (aiWrapper) aiWrapper.hidden = false;
       }
 
-      const game = new Game(canvas, { aiMode });
+      const game = new Game(canvas, { aiMode, timeAttack });
 
       const announcer = document.getElementById('game-announcements');
       game.setAnnouncer(announcer);
@@ -254,6 +268,33 @@
       if (localStorage.getItem('reducedMotion') === 'true') {
         document.body.classList.add('reduced-motion');
       }
+
+      // Social sharing
+      document.getElementById('share-x')?.addEventListener('click', () => {
+        const data = game.getShareData();
+        const url = encodeURIComponent(window.location.origin);
+        const text = encodeURIComponent(data.text);
+        window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'noopener,noreferrer');
+      });
+
+      document.getElementById('share-linkedin')?.addEventListener('click', () => {
+        const data = game.getShareData();
+        const url = encodeURIComponent(window.location.origin);
+        const text = encodeURIComponent(data.text);
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}&summary=${text}`, '_blank', 'noopener,noreferrer');
+      });
+
+      document.getElementById('share-instagram')?.addEventListener('click', async () => {
+        const data = game.getShareData();
+        try {
+          await navigator.clipboard.writeText(data.text + ' #MARIOAI #RetroGaming');
+          const btn = document.getElementById('share-instagram');
+          if (btn) { btn.textContent = 'COPIED!'; setTimeout(() => { btn.textContent = '\uD83D\uDCF7'; }, 2000); }
+        } catch {
+          const btn = document.getElementById('share-instagram');
+          if (btn) { btn.textContent = '!'; setTimeout(() => { btn.textContent = '\uD83D\uDCF7'; }, 2000); }
+        }
+      });
 
       // Resume audio context on first interaction
       document.addEventListener('click', () => audioManager.resume(), { once: true });

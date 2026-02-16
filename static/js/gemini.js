@@ -129,4 +129,25 @@ async function getStrategyAnalysis(context) {
   }
 }
 
-export { isGeminiAvailable, buildContext, getGameTip, chatWithCompanion, getCommentary, getStrategyAnalysis };
+/**
+ * Get AI live coaching advice by reading the current game state.
+ * @param {object} context - Game context from buildContext()
+ * @param {string} situation - Brief description of current situation
+ * @returns {Promise<string|null>} Coaching advice or null
+ */
+async function getLiveCoach(context, situation) {
+  try {
+    const res = await fetch('/api/gemini/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context, situation }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.advice || null;
+  } catch {
+    return null;
+  }
+}
+
+export { isGeminiAvailable, buildContext, getGameTip, chatWithCompanion, getCommentary, getStrategyAnalysis, getLiveCoach };

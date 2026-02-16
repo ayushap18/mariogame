@@ -784,3 +784,71 @@ input:focus-visible {
   content: '';
   display: block;
 }
+
+/* ---------- Time Attack Button ---------- */
+.btn-timeattack {
+  background-color: #FF6B00;
+  color: #fff;
+  border-color: #CC5500;
+}
+
+.btn-timeattack:hover { background-color: #FF8533; }
+
+/* ---------- Social Share Bar ---------- */
+.share-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 800px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  font-size: 7px;
+}
+
+.share-label {
+  color: var(--text-accent);
+  white-space: nowrap;
+  font-family: var(--font-retro);
+  font-size: 7px;
+}
+
+.share-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-retro);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.share-btn:hover {
+  transform: scale(1.1);
+}
+
+.share-btn:active {
+  transform: scale(0.95);
+}
+
+.share-x {
+  background: #000;
+  color: #fff;
+}
+
+.share-linkedin {
+  background: #0A66C2;
+  color: #fff;
+  font-weight: bold;
+}
+
+.share-instagram {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  color: #fff;
+}

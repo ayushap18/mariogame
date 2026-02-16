@@ -10,7 +10,7 @@ import { renderSprite } from './sprites.js';
 
 const AI_MOVE_SPEED = 2.5;
 const AI_JUMP_FORCE = -10;
-const AI_LOOK_AHEAD = 5;
+const AI_LOOK_AHEAD = 6;
 const AI_REACTION_DELAY = 8;
 
 class AIPlayer {
@@ -85,17 +85,18 @@ class AIPlayer {
   _decide(levelData, entities) {
     const input = { left: false, right: false, jump: false };
 
-    if (this.frameCount % AI_REACTION_DELAY < 2) {
-      input.right = true;
-      return input;
-    }
-
     input.right = true;
 
     const col = Math.floor((this.x + this.w / 2) / TILE_SIZE);
     const row = Math.floor((this.y + this.h) / TILE_SIZE);
 
+    // Always check for gaps and edges - critical for survival
     if (this._isGapAhead(levelData, col, row)) {
+      input.jump = true;
+    }
+
+    // Check ground directly below current position
+    if (this.onGround && this._isEdgeBelow(levelData, col, row)) {
       input.jump = true;
     }
 
@@ -103,36 +104,52 @@ class AIPlayer {
       input.jump = true;
     }
 
-    const nearestEnemy = this._findNearestEnemy(entities);
-    if (nearestEnemy) {
-      const dx = nearestEnemy.x - this.x;
-      if (dx > 0 && dx < 60 && this.onGround) {
-        input.jump = true;
+    // Only do advanced decisions (enemies, coins) outside reaction delay
+    if (this.frameCount % AI_REACTION_DELAY >= 2) {
+      const nearestEnemy = this._findNearestEnemy(entities);
+      if (nearestEnemy) {
+        const dx = nearestEnemy.x - this.x;
+        if (dx > 0 && dx < 60 && this.onGround) {
+          input.jump = true;
+        }
+        if (dx < 0 && dx > -30) {
+          input.jump = true;
+        }
       }
-      if (dx < 0 && dx > -30) {
-        input.jump = true;
-      }
-    }
 
-    const nearestCoin = this._findNearestCoin(entities);
-    if (nearestCoin) {
-      const dx = nearestCoin.x - this.x;
-      const dy = nearestCoin.y - this.y;
-      if (dy < -20 && Math.abs(dx) < 40 && this.onGround) {
+      const nearestCoin = this._findNearestCoin(entities);
+      if (nearestCoin) {
+        const dx = nearestCoin.x - this.x;
+        const dy = nearestCoin.y - this.y;
+        if (dy < -20 && Math.abs(dx) < 40 && this.onGround) {
+          input.jump = true;
+        }
+        if (dx < -10 && Math.abs(dy) < 30) {
+          input.left = true;
+          input.right = false;
+          this.facing = -1;
+        }
+      }
+
+      if (Math.random() < 0.01 && this.onGround) {
         input.jump = true;
       }
-      if (dx < -10 && Math.abs(dy) < 30) {
-        input.left = true;
-        input.right = false;
-        this.facing = -1;
-      }
-    }
-
-    if (Math.random() < 0.01 && this.onGround) {
-      input.jump = true;
     }
 
     return input;
+  }
+
+  _isEdgeBelow(levelData, col, row) {
+    // Check if the next 1-2 tiles ahead have no ground immediately below
+    const checkCol = col + 1;
+    if (checkCol < 0 || row >= levelData.length || checkCol >= levelData[0].length) return false;
+    if (row < levelData.length && !SOLID_TILES.has(levelData[row][checkCol])) {
+      // No ground at feet level for next tile
+      if (row + 1 >= levelData.length || !SOLID_TILES.has(levelData[row + 1][checkCol])) {
+        return true;
+      }
+    }
+    return false;
   }
 
   _isGapAhead(levelData, col, row) {

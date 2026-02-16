@@ -1,6 +1,6 @@
 # MARIO.AI
 
-A reimagined retro-style side-scrolling platformer inspired by Super Mario Bros, built for 2026 with Google Gemini AI integration. Features an AI-powered game companion, voice helper mode, ghost opponent mode, power-ups, CRT retro effects, Firebase leaderboard, and procedural audio — all with zero image or audio files.
+A reimagined retro-style side-scrolling platformer inspired by Super Mario Bros, built for 2026 with Google Gemini AI integration. Features an AI-powered game companion, AI Live Coach, voice helper mode, ghost opponent mode, Time Attack mode, social sharing, combo scoring, power-ups, CRT retro effects, Firebase leaderboard, and procedural audio — all with zero image or audio files.
 
 ## Chosen Vertical
 
@@ -22,11 +22,21 @@ The core idea is to take the classic Mario platformer experience and enhance it 
 
 6. **VS AI Mode**: Compete against a rule-based AI ghost opponent that navigates levels autonomously, adding a competitive element.
 
-7. **Power-ups**: Classic mushroom (extra life) and star (10-second invincibility with rainbow flash) power-ups spawn from question blocks.
+7. **AI Live Coach**: Gemini reads the actual game state in real-time (player progress, enemies, coins, power-up status) and delivers urgent coaching instructions every 15 seconds during gameplay.
 
-8. **Global Leaderboard**: Firebase-powered score tracking with Google Sign-In authentication.
+8. **Time Attack Mode**: Race against a 90-second clock with doubled time bonuses for fast completion — a unique competitive variant.
 
-9. **Retro CRT Effects**: Authentic CRT scanlines and vignette effects rendered on canvas and via CSS for maximum retro feel.
+9. **Combo Scoring System**: Chain enemy stomps within a 2-second window for multiplier bonuses up to 8x, with rainbow HUD indicator.
+
+10. **Screen Shake Effects**: Impactful visual feedback on enemy stomps and brick breaks with decaying camera shake.
+
+11. **Social Sharing**: One-click share your score to X (Twitter), LinkedIn, or copy for Instagram with hashtags.
+
+12. **Power-ups**: Classic mushroom (extra life) and star (10-second invincibility with rainbow flash) power-ups spawn from question blocks.
+
+13. **Global Leaderboard**: Firebase-powered score tracking with Google Sign-In authentication.
+
+14. **Retro CRT Effects**: Authentic CRT scanlines and vignette effects rendered on canvas and via CSS for maximum retro feel.
 
 ## How the Solution Works
 
@@ -62,11 +72,12 @@ Browser (Client)                    Cloud Run (Server)
 
 ### AI Integration
 - **Server-side proxy**: Express.js server proxies Gemini API requests, keeping the API key secure
-- **Five AI endpoints**:
+- **Six AI endpoints**:
   - `/api/gemini/tip` — Contextual gameplay tips based on player stats
   - `/api/gemini/chat` — Conversational AI companion
   - `/api/gemini/commentary` — Dynamic event commentary (supports 8 event types)
   - `/api/gemini/strategy` — Detailed performance analysis and skill rating
+  - `/api/gemini/coach` — AI Live Coach that reads game state and gives real-time guidance
   - `/api/gemini/status` — AI availability check
 - **Voice output**: Web Speech API reads AI responses aloud when voice mode is enabled
 - **Auto-triggered commentary**: Game events automatically request Gemini commentary with cooldown management
@@ -77,7 +88,7 @@ Browser (Client)                    Cloud Run (Server)
 
 | Service | Purpose | Implementation |
 |---------|---------|----------------|
-| **Google Gemini AI** | AI companion chat, contextual tips, game commentary, strategy analysis | Server-side via `@google/generative-ai` SDK, proxied through 5 Express endpoints |
+| **Google Gemini AI** | AI companion chat, contextual tips, game commentary, strategy analysis, live coaching | Server-side via `@google/generative-ai` SDK, proxied through 6 Express endpoints |
 | **Firebase Authentication** | Google Sign-In for player accounts | Client-side Firebase Auth SDK with popup sign-in flow |
 | **Cloud Firestore** | Global leaderboard storage and retrieval | Score submission with server timestamps, ordered queries |
 | **Google Analytics 4** | Game event tracking (starts, completions, scores, AI usage) | Client-side gtag.js with custom events |
@@ -92,7 +103,7 @@ Browser (Client)                    Cloud Run (Server)
 mario-ai/
 ├── index.html                 # Dashboard with menu, leaderboard, AI companion, settings
 ├── game.html                  # Game page with canvas, controls, AI tips, voice toggle
-├── server.js                  # Express server with Gemini API proxy (5 endpoints)
+├── server.js                  # Express server with Gemini API proxy (6 endpoints)
 ├── package.json               # Node.js dependencies and scripts
 ├── Dockerfile                 # Cloud Run deployment container
 ├── .dockerignore              # Docker build exclusions
@@ -101,7 +112,7 @@ mario-ai/
 │   ├── css/
 │   │   └── style.css          # Responsive styles, CRT effects, voice UI, accessibility
 │   └── js/
-│       ├── game.js            # Main game loop, state management, AI commentary, power-ups, CRT
+│       ├── game.js            # Main game loop, state management, AI commentary, power-ups, CRT, combo, coach
 │       ├── engine.js          # Physics, AABB collision, camera system
 │       ├── player.js          # Player entity with movement, star power, animation
 │       ├── ai-player.js       # AI ghost opponent with decision-making
@@ -111,7 +122,7 @@ mario-ai/
 │       ├── input.js           # Keyboard and touch input manager
 │       ├── audio.js           # Web Audio procedural sound effects (incl. star, voice-ready)
 │       ├── services.js        # Firebase Auth, Firestore, Analytics
-│       ├── gemini.js          # Client-side Gemini AI integration (tips, chat, commentary, strategy)
+│       ├── gemini.js          # Client-side Gemini AI integration (tips, chat, commentary, strategy, coach)
 │       ├── voice.js           # AI Voice Helper using Web Speech API
 │       └── dashboard.js       # Dashboard page controller with voice integration
 ├── tests/
@@ -277,13 +288,19 @@ gcloud run deploy mario-ai \
 - **Power-ups**: Mushroom (extra life) and Star (10-second invincibility with rainbow flash) from question blocks
 - **Gemini AI Companion**: Chat-based game companion powered by Google Gemini for tips and strategies
 - **Real-time AI Tips**: Context-aware gameplay tips based on your current performance
+- **AI Live Coach**: Gemini reads your game state (progress, enemies, items) and shouts coaching instructions in real-time
 - **AI Voice Helper**: Toggle voice mode to hear tips, commentary, and strategy spoken aloud (Web Speech API)
 - **AI Commentary Overlay**: Auto-triggered retro-styled Gemini commentary on game events (displayed on canvas)
 - **AI Strategy Analysis**: Detailed performance analysis with skill rating, strengths, and improvement suggestions
 - **VS AI Mode**: Compete against a ghost AI opponent that navigates levels autonomously
+- **Time Attack Mode**: 90-second race against the clock with doubled speed bonuses
+- **Combo Scoring**: Chain enemy stomps for multiplier bonuses up to 8x with rainbow HUD indicator
+- **Screen Shake**: Camera shake effects on stomps and brick breaks for kinetic feedback
+- **Social Sharing**: One-click share scores to X (Twitter), LinkedIn, or copy for Instagram
 - **3 Progressive Worlds**: Increasing difficulty across World 1-1, 1-2, and 1-3
 - **Global Leaderboard**: Firebase-powered leaderboard with Google Sign-In
 - **CRT Retro Effects**: Authentic scanline and vignette effects on game canvas
+- **Parallax Backgrounds**: Multi-layer scrolling clouds, hills, and bushes
 - **Procedural Audio**: Retro sound effects generated using Web Audio API (including star power-up)
 - **Pixel Art Rendering**: All sprites drawn programmatically on Canvas
 - **Responsive Design**: Desktop and mobile with touch controls
@@ -293,11 +310,12 @@ gcloud run deploy mario-ai \
 
 - **Skip Navigation**: Skip link to jump to main content
 - **Screen Reader**: ARIA live regions announce game events
-- **Keyboard Navigation**: Full keyboard support for menus and gameplay
+- **Keyboard Navigation**: Full keyboard support for menus and gameplay, Escape closes dialog panels
 - **High Contrast Mode**: Toggle in settings for improved visibility
 - **Reduced Motion**: Respects system preference and provides manual toggle
 - **Semantic HTML**: Proper landmarks, headings, and ARIA roles
 - **Focus Indicators**: Visible focus rings on all interactive elements
+- **ARIA Expanded**: Panel toggle buttons communicate open/closed state to assistive technology
 - **Touch Controls**: Mobile-friendly touch buttons with labels
 - **Voice Helper**: AI responses can be spoken aloud for accessibility
 
@@ -333,7 +351,7 @@ Open `tests/index.html` in a browser to run 130+ unit test assertions covering:
 ```bash
 npm test
 ```
-Tests cover server input sanitization, game context validation, event type validation (including power-up and coin streak events).
+Tests cover server input sanitization, game context validation, event type validation (including power-up and coin streak events), rate limiting logic, game mode validation (solo/ai/time_attack), and share data sanitization. **25 tests across 6 suites.**
 
 ## Tech Stack
 

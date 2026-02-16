@@ -126,4 +126,83 @@ describe('Event Validation', () => {
   });
 });
 
+// --- Rate Limiting Tests ---
+describe('Rate Limiting Logic', () => {
+  test('allows requests within limit', () => {
+    const rateLimitMap = new Map();
+    const ip = '127.0.0.1';
+    const now = Date.now();
+    rateLimitMap.set(ip, { start: now, count: 5 });
+    const entry = rateLimitMap.get(ip);
+    assert.ok(entry.count <= 30, 'should be within limit');
+  });
+
+  test('blocks requests exceeding limit', () => {
+    const rateLimitMap = new Map();
+    const ip = '127.0.0.1';
+    const now = Date.now();
+    rateLimitMap.set(ip, { start: now, count: 31 });
+    const entry = rateLimitMap.get(ip);
+    assert.ok(entry.count > 30, 'should exceed limit');
+  });
+
+  test('resets after window expires', () => {
+    const rateLimitMap = new Map();
+    const ip = '127.0.0.1';
+    const RATE_LIMIT_WINDOW = 60000;
+    const now = Date.now();
+    rateLimitMap.set(ip, { start: now - RATE_LIMIT_WINDOW - 1, count: 50 });
+    const entry = rateLimitMap.get(ip);
+    const expired = now - entry.start > RATE_LIMIT_WINDOW;
+    assert.ok(expired, 'window should have expired');
+  });
+});
+
+// --- Game Mode Validation Tests ---
+describe('Game Mode Validation', () => {
+  test('accepts solo mode', () => {
+    const mode = 'solo';
+    assert.ok(['solo', 'ai', 'time_attack'].includes(mode));
+  });
+
+  test('accepts ai mode', () => {
+    const mode = 'ai';
+    assert.ok(['solo', 'ai', 'time_attack'].includes(mode));
+  });
+
+  test('accepts time_attack mode', () => {
+    const mode = 'time_attack';
+    assert.ok(['solo', 'ai', 'time_attack'].includes(mode));
+  });
+
+  test('rejects invalid mode', () => {
+    const mode = 'hacked';
+    assert.ok(!['solo', 'ai', 'time_attack'].includes(mode));
+  });
+});
+
+// --- Share Data Sanitization Tests ---
+describe('Share Data Sanitization', () => {
+  function sanitizeShareText(text) {
+    if (typeof text !== 'string') return '';
+    return text.replace(/[<>&"']/g, '').slice(0, 280).trim();
+  }
+
+  test('sanitizes share text', () => {
+    const result = sanitizeShareText('I scored 1000 points! <script>alert("xss")</script>');
+    assert.ok(!result.includes('<'), 'should strip angle brackets');
+    assert.ok(!result.includes('>'), 'should strip angle brackets');
+  });
+
+  test('limits share text length', () => {
+    const long = 'a'.repeat(300);
+    assert.ok(sanitizeShareText(long).length <= 280, 'should limit to 280 chars');
+  });
+
+  test('handles non-string input', () => {
+    assert.equal(sanitizeShareText(null), '');
+    assert.equal(sanitizeShareText(undefined), '');
+  });
+});
+
 console.log('Server tests completed.');

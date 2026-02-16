@@ -285,6 +285,48 @@ Be encouraging and retro-gaming themed.`;
 });
 
 /**
+ * POST /api/gemini/coach
+ * AI Live Coach - reads game state and gives real-time guidance.
+ */
+app.post('/api/gemini/coach', rateLimit, async (req, res) => {
+  if (!geminiModel) {
+    return res.status(503).json({ error: 'AI service not available.' });
+  }
+
+  const context = validateGameContext(req.body.context);
+  const situation = sanitizeString(req.body.situation, 200);
+
+  if (!context) {
+    return res.status(400).json({ error: 'Invalid game context.' });
+  }
+
+  try {
+    const prompt = `You are an AI Live Coach watching a MARIO.AI game in real-time. Read the player's current game state and give immediate, actionable guidance.
+
+Current game state:
+- Score: ${context.score}
+- Level: World 1-${context.level}
+- Lives: ${context.lives}
+- Coins: ${context.coins}
+- Deaths: ${context.deaths}
+- Enemies stomped: ${context.enemiesStomped}
+- Time remaining: ${context.timeRemaining}s
+- Mode: ${context.mode === 'ai' ? 'Racing against AI opponent' : 'Solo mode'}
+${situation ? `- Current situation: ${situation}` : ''}
+
+Give ONE direct coaching instruction (max 12 words). Be urgent and specific like a real coach shouting from the sidelines. Examples: "Jump NOW over the gap ahead!" "Stomp that goomba for combo points!" "Rush right, time is running out!"`;
+
+    const result = await geminiModel.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    res.json({ advice: text });
+  } catch (err) {
+    console.error('Gemini coach error:', err.message);
+    res.status(500).json({ error: 'Failed to generate coaching advice.' });
+  }
+});
+
+/**
  * GET /api/gemini/status
  * Check if Gemini AI is available.
  */

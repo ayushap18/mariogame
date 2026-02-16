@@ -25,6 +25,7 @@ class Dashboard {
   _bindElements() {
     this.playBtn = document.getElementById('play-btn');
     this.aiBtn = document.getElementById('ai-btn');
+    this.timeAttackBtn = document.getElementById('timeattack-btn');
     this.companionBtn = document.getElementById('companion-btn');
     this.leaderboardBtn = document.getElementById('leaderboard-btn');
     this.settingsBtn = document.getElementById('settings-btn');
@@ -53,6 +54,7 @@ class Dashboard {
   _bindEvents() {
     this.playBtn?.addEventListener('click', () => this._startGame(false));
     this.aiBtn?.addEventListener('click', () => this._startGame(true));
+    this.timeAttackBtn?.addEventListener('click', () => this._startGame(false, true));
     this.signInBtn?.addEventListener('click', () => this._signIn());
     this.signOutBtn?.addEventListener('click', () => this._signOut());
 
@@ -111,12 +113,28 @@ class Dashboard {
         this._startGame(true);
       }
     });
+
+    // Escape key closes any open panel
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const panels = ['companion', 'leaderboard', 'settings'];
+        for (const panel of panels) {
+          const el = { companion: this.companionPanel, leaderboard: this.leaderboardPanel, settings: this.settingsPanel }[panel];
+          if (el && !el.hidden) {
+            this._closePanel(panel);
+            break;
+          }
+        }
+      }
+    });
   }
 
-  _startGame(aiMode) {
+  _startGame(aiMode, timeAttack) {
     audioManager.init();
     audioManager.menuSelect();
-    const params = aiMode ? '?mode=ai' : '';
+    let params = '';
+    if (aiMode) params = '?mode=ai';
+    else if (timeAttack) params = '?mode=timeattack';
     window.location.href = 'game.html' + params;
   }
 
@@ -189,6 +207,16 @@ class Dashboard {
 
     el.hidden = !isHidden;
 
+    // Update aria-expanded on toggle buttons
+    const toggleBtns = {
+      companion: this.companionBtn,
+      leaderboard: this.leaderboardBtn,
+      settings: this.settingsBtn,
+    };
+    for (const [key, btn] of Object.entries(toggleBtns)) {
+      if (btn) btn.setAttribute('aria-expanded', String(key === panel && !el.hidden));
+    }
+
     if (!el.hidden) {
       const focusable = el.querySelector('button, [tabindex], input');
       if (focusable) focusable.focus();
@@ -211,7 +239,10 @@ class Dashboard {
     const el = panels[panel];
     if (el) el.hidden = true;
     const btn = btns[panel];
-    if (btn) btn.focus();
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.focus();
+    }
   }
 
   async _checkCompanionAvailability() {

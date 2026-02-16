@@ -14,7 +14,7 @@ import { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup, creat
 import { audioManager } from './audio.js';
 import { voiceHelper } from './voice.js';
 import { trackGameStart, trackLevelComplete, trackGameOver, submitScore, getUser } from './services.js';
-import { isGeminiAvailable, buildContext, getCommentary, getStrategyAnalysis } from './gemini.js';
+import { isGeminiAvailable, buildContext, getCommentary, getStrategyAnalysis, getLiveCoach } from './gemini.js';
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 224;
@@ -26,6 +26,7 @@ class Game {
     this.ctx = canvas.getContext('2d');
     this.options = options || {};
     this.aiMode = this.options.aiMode || false;
+    this.timeAttack = this.options.timeAttack || false;
 
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
@@ -72,6 +73,11 @@ class Game {
     // Screen shake
     this._shakeTimer = 0;
     this._shakeIntensity = 0;
+
+    // AI Live Coach
+    this._coachTimer = 0;
+    this._coachText = '';
+    this._coachDisplayTimer = 0;
 
     // Retro background decorations (parallax clouds, hills, bushes)
     this._bgDecorations = this._generateBackgroundDecorations();
@@ -134,7 +140,7 @@ class Game {
     this.stars = [];
     this.floatingTexts = [];
     this.particles = [];
-    this.timer = data.time * 60;
+    this.timer = this.timeAttack ? 90 * 60 : data.time * 60;
 
     for (const e of data.entities) {
       switch (e.type) {
@@ -198,6 +204,15 @@ class Game {
     if (this._shakeTimer > 0) {
       this._shakeTimer--;
       this._shakeIntensity *= 0.85;
+    }
+
+    // AI Live Coach auto-trigger
+    if (this._coachDisplayTimer > 0) this._coachDisplayTimer--;
+    if (this._coachTimer > 0) {
+      this._coachTimer--;
+    } else if (this._geminiReady && this.state === STATES.PLAYING) {
+      this._coachTimer = 900; // 15 seconds
+      this._triggerCoach();
     }
 
     if (this.state === STATES.READY) {
@@ -435,10 +450,13 @@ class Game {
       if (this.physics.checkEntityCollision(this.player, flag)) {
         flag.reached = true;
         this.player.finished = true;
-        const timeBonus = Math.floor(this.timer / 60) * 50;
+        const timeBonus = Math.floor(this.timer / 60) * (this.timeAttack ? 100 : 50);
         this.player.addScore(1000 + timeBonus);
         audioManager.levelComplete();
         this.floatingTexts.push(new FloatingText(flag.x, flag.y - 20, `+${1000 + timeBonus}`, '#00FF00'));
+        if (this.timeAttack) {
+          this.floatingTexts.push(new FloatingText(flag.x, flag.y - 35, 'SPEED BONUS!', '#FF4444'));
+        }
 
         trackLevelComplete(this.currentLevel + 1, this.player.score, Math.floor(this.timer / 60));
 
@@ -600,6 +618,50 @@ class Game {
     return analysis;
   }
 
+  // AI Live Coach - reads game state and gives direct guidance
+  async _triggerCoach() {
+    if (!this._geminiReady || !this.player) return;
+
+    const situation = this._readGameSituation();
+    const context = buildContext(
+      this.player,
+      this.currentLevel + 1,
+      Math.floor((this.timer || 0) / 60),
+      this.timeAttack ? 'time_attack' : this.aiMode ? 'ai' : 'solo',
+      this.deathCount,
+      this.stompCount
+    );
+
+    const advice = await getLiveCoach(context, situation);
+    if (advice) {
+      this._coachText = advice;
+      this._coachDisplayTimer = 180; // 3 seconds
+      voiceHelper.speakTip(advice);
+    }
+  }
+
+  _readGameSituation() {
+    if (!this.player || !this.level) return '';
+    const parts = [];
+    const col = Math.floor(this.player.x / TILE_SIZE);
+    const totalCols = this.level.cols;
+    const progress = Math.floor((col / totalCols) * 100);
+    parts.push(`${progress}% through level`);
+
+    const aliveEnemies = this.enemies.filter(e => e.alive).length;
+    if (aliveEnemies > 0) parts.push(`${aliveEnemies} enemies remaining`);
+
+    const uncollectedCoins = this.coins.filter(c => !c.collected).length;
+    if (uncollectedCoins > 0) parts.push(`${uncollectedCoins} coins left`);
+
+    if (this.player.lives <= 1) parts.push('low on lives');
+    if (this._starTimer > 0) parts.push('star power active');
+    if (this._comboMultiplier > 1) parts.push(`${this._comboMultiplier}x combo active`);
+    if (this.timeAttack) parts.push('time attack mode');
+
+    return parts.join(', ');
+  }
+
   _render() {
     const ctx = this.ctx;
 
@@ -633,6 +695,7 @@ class Game {
 
     this._renderHUD(ctx);
     this._renderCommentary(ctx);
+    this._renderCoach(ctx);
     this._renderCRT(ctx);
 
     // Restore screen shake transform
@@ -800,8 +863,16 @@ class Game {
     ctx.fillText(`x${this.player.coins.toString().padStart(2, '0')}`, 80, 20);
 
     ctx.textAlign = 'center';
-    ctx.fillText(this.level.name, CANVAS_WIDTH / 2, 10);
-    ctx.fillText(`TIME: ${Math.max(0, Math.floor(this.timer / 60))}`, CANVAS_WIDTH / 2, 20);
+    if (this.timeAttack) {
+      const timeLeft = Math.max(0, Math.floor(this.timer / 60));
+      const urgent = timeLeft <= 30;
+      ctx.fillStyle = urgent ? '#FF4444' : '#FFD700';
+      ctx.fillText('TIME ATTACK', CANVAS_WIDTH / 2, 10);
+      ctx.fillText(`${timeLeft}s`, CANVAS_WIDTH / 2, 20);
+    } else {
+      ctx.fillText(this.level.name, CANVAS_WIDTH / 2, 10);
+      ctx.fillText(`TIME: ${Math.max(0, Math.floor(this.timer / 60))}`, CANVAS_WIDTH / 2, 20);
+    }
 
     ctx.textAlign = 'right';
     ctx.fillText(`LIVES`, CANVAS_WIDTH - 8, 10);
@@ -849,6 +920,29 @@ class Game {
     ctx.restore();
   }
 
+  _renderCoach(ctx) {
+    if (this._coachDisplayTimer <= 0 || !this._coachText) return;
+
+    ctx.save();
+    const alpha = Math.min(1, this._coachDisplayTimer / 20);
+    ctx.globalAlpha = alpha * 0.95;
+
+    // Coach bar at top
+    ctx.fillStyle = 'rgba(0, 100, 0, 0.85)';
+    ctx.fillRect(0, 28, CANVAS_WIDTH, 16);
+
+    ctx.fillStyle = '#00FF00';
+    ctx.font = 'bold 6px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('COACH:', 6, 39);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '6px monospace';
+    ctx.fillText(this._coachText.substring(0, 55), 42, 39);
+
+    ctx.restore();
+  }
+
   _renderCRT(ctx) {
     // Subtle CRT scanline effect
     ctx.save();
@@ -881,6 +975,14 @@ class Game {
 
     ctx.font = '8px monospace';
     ctx.fillText(subtitle, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 12);
+  }
+
+  getShareData() {
+    const mode = this.timeAttack ? 'Time Attack' : this.aiMode ? 'VS AI' : 'Solo';
+    const score = this.player ? this.player.score : 0;
+    const level = this.currentLevel + 1;
+    const text = `I scored ${score.toLocaleString()} points in MARIO.AI ${mode} mode (Level ${level})! Can you beat my score?`;
+    return { text, score, mode, level };
   }
 
   destroy() {
