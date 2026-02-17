@@ -128,6 +128,7 @@ class Game {
 
     if (this.aiMode) {
       this.aiPlayer = new AIPlayer(data.aiStart.x, data.aiStart.y);
+      this.aiPlayer.setDifficulty(index);
       this.aiPlayer.onHeadHitBlock((col, row) => this._onBlockHit(col, row, this.aiPlayer));
     } else {
       this.aiPlayer = null;
@@ -463,15 +464,8 @@ class Game {
         this._triggerCommentary('level_complete');
 
         setTimeout(() => {
-          if (this.currentLevel + 1 < getLevelCount()) {
-            this.state = STATES.LEVEL_COMPLETE;
-            this._announce(`Level complete! Score: ${this.player.score}. Press Enter to continue.`);
-          } else {
-            this.state = STATES.WIN;
-            this._announce(`You win! Final score: ${this.player.score}. Press Enter to play again.`);
-            this._triggerCommentary('game_win');
-            this._submitHighScore();
-          }
+          this.state = STATES.LEVEL_COMPLETE;
+          this._announce(`Level complete! Score: ${this.player.score}. Press Enter to continue.`);
         }, 1500);
       }
 

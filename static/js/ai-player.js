@@ -3,15 +3,16 @@
  * Uses rule-based decision making: moves forward, jumps over gaps
  * and obstacles, stomps enemies, and collects coins.
  * Rendered as a semi-transparent ghost overlay.
+ * Difficulty scales with level: speed, look-ahead, and reaction improve.
  */
 
 import { FRICTION, TILE_SIZE, SOLID_TILES } from './engine.js';
 import { renderSprite } from './sprites.js';
 
-const AI_MOVE_SPEED = 2.5;
+const AI_BASE_SPEED = 2.5;
 const AI_JUMP_FORCE = -10;
-const AI_LOOK_AHEAD = 6;
-const AI_REACTION_DELAY = 8;
+const AI_BASE_LOOK_AHEAD = 6;
+const AI_BASE_REACTION_DELAY = 8;
 
 class AIPlayer {
   constructor(x, y) {
@@ -33,6 +34,25 @@ class AIPlayer {
     this.deathTimer = 0;
     this._headHitCallbacks = [];
     this._approachSpeed = 0;
+    // Difficulty-scaled stats (defaults = level 1)
+    this._moveSpeed = AI_BASE_SPEED;
+    this._lookAhead = AI_BASE_LOOK_AHEAD;
+    this._reactionDelay = AI_BASE_REACTION_DELAY;
+    this._difficultyLevel = 0;
+  }
+
+  /**
+   * Scale AI difficulty based on current level index.
+   * Higher levels = faster, better look-ahead, quicker reactions.
+   */
+  setDifficulty(levelIndex) {
+    this._difficultyLevel = levelIndex;
+    // Speed: 2.5 → caps at 4.5
+    this._moveSpeed = Math.min(4.5, AI_BASE_SPEED + levelIndex * 0.15);
+    // Look-ahead: 6 → caps at 10
+    this._lookAhead = Math.min(10, AI_BASE_LOOK_AHEAD + Math.floor(levelIndex * 0.4));
+    // Reaction delay: 8 → min 3 (lower = faster reactions)
+    this._reactionDelay = Math.max(3, AI_BASE_REACTION_DELAY - Math.floor(levelIndex * 0.5));
   }
 
   onHeadHitBlock(callback) {
@@ -58,10 +78,10 @@ class AIPlayer {
     const input = this._decide(levelData, entities);
 
     if (input.left) {
-      this.vx = -AI_MOVE_SPEED;
+      this.vx = -this._moveSpeed;
       this.facing = -1;
     } else if (input.right) {
-      this.vx = AI_MOVE_SPEED;
+      this.vx = this._moveSpeed;
       this.facing = 1;
     } else if (this._approachSpeed > 0) {
       // Controlled approach towards enemy
@@ -110,7 +130,7 @@ class AIPlayer {
     }
 
     // Only do advanced decisions (enemies, coins) outside reaction delay
-    if (this.frameCount % AI_REACTION_DELAY >= 2) {
+    if (this.frameCount % this._reactionDelay >= 2) {
       const nearestEnemy = this._findNearestEnemy(entities);
       if (nearestEnemy) {
         const dx = nearestEnemy.x - this.x;
@@ -170,7 +190,7 @@ class AIPlayer {
   }
 
   _isGapAhead(levelData, col, row) {
-    for (let i = 1; i <= AI_LOOK_AHEAD; i++) {
+    for (let i = 1; i <= this._lookAhead; i++) {
       const checkCol = col + i;
       if (checkCol >= 0 && row < levelData.length && checkCol < levelData[0].length) {
         let hasGround = false;
