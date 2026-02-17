@@ -120,6 +120,24 @@ class AudioManager {
     this._playTone(660, 0.08, 'square', 0.2);
   }
 
+  fireball() {
+    this._playTone(800, 0.04, 'sawtooth', 0.3);
+    setTimeout(() => this._playTone(600, 0.06, 'sawtooth', 0.2), 40);
+  }
+
+  speedBoost() {
+    const notes = [660, 880, 1100, 1320];
+    notes.forEach((freq, i) => {
+      setTimeout(() => this._playTone(freq, 0.06, 'square', 0.25), i * 50);
+    });
+  }
+
+  magnetPickup() {
+    this._playTone(440, 0.1, 'triangle', 0.3);
+    setTimeout(() => this._playTone(660, 0.1, 'triangle', 0.3), 80);
+    setTimeout(() => this._playTone(880, 0.15, 'triangle', 0.25), 160);
+  }
+
   setVolume(vol) {
     this.volume = Math.max(0, Math.min(1, vol));
   }

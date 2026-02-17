@@ -334,4 +334,178 @@ function createPowerupParticles(x, y, color) {
   return particles;
 }
 
-export { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup, createBrickParticles, createPowerupParticles };
+class FireFlower {
+  constructor(x, y) {
+    this.type = 'fire_flower';
+    this.x = x;
+    this.y = y;
+    this.w = 14;
+    this.h = 14;
+    this.vx = 0;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.collected = false;
+    this.spawnTimer = 0;
+    this.spawnY = y;
+    this.animTimer = 0;
+  }
+
+  update() {
+    if (!this.active || this.collected) return;
+    this.spawnTimer++;
+    if (this.spawnTimer < 16) {
+      this.y = this.spawnY - this.spawnTimer;
+      return;
+    }
+    this.animTimer++;
+  }
+
+  collect() {
+    this.collected = true;
+    this.active = false;
+  }
+
+  render(ctx, camera) {
+    if (!this.active || this.collected) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    const sprite = renderSprite('fire_flower', 1);
+    if (sprite) ctx.drawImage(sprite, drawX, drawY);
+  }
+}
+
+class Fireball {
+  constructor(x, y, direction) {
+    this.type = 'fireball';
+    this.x = x;
+    this.y = y;
+    this.w = 8;
+    this.h = 8;
+    this.vx = 5 * direction;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.bounces = 0;
+    this.maxBounces = 3;
+    this.life = 120; // 2 seconds
+    this.animTimer = 0;
+  }
+
+  update() {
+    if (!this.active) return;
+    this.life--;
+    if (this.life <= 0) {
+      this.active = false;
+      return;
+    }
+    this.animTimer++;
+    if (this.onGround) {
+      this.vy = -4;
+      this.onGround = false;
+      this.bounces++;
+      if (this.bounces > this.maxBounces) {
+        this.active = false;
+      }
+    }
+  }
+
+  render(ctx, camera) {
+    if (!this.active) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    ctx.save();
+    const hue = (this.animTimer * 20) % 60;
+    ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+    ctx.beginPath();
+    ctx.arc(drawX + 4, drawY + 4, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+class SpeedBoost {
+  constructor(x, y) {
+    this.type = 'speed_boost';
+    this.x = x;
+    this.y = y;
+    this.w = 14;
+    this.h = 14;
+    this.vx = 1.5;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.collected = false;
+    this.spawnTimer = 0;
+    this.spawnY = y;
+    this.animTimer = 0;
+  }
+
+  update() {
+    if (!this.active || this.collected) return;
+    this.spawnTimer++;
+    if (this.spawnTimer < 16) {
+      this.y = this.spawnY - this.spawnTimer;
+      return;
+    }
+    this.x += this.vx;
+    this.animTimer++;
+  }
+
+  collect() {
+    this.collected = true;
+    this.active = false;
+  }
+
+  render(ctx, camera) {
+    if (!this.active || this.collected) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    const sprite = renderSprite('speed_boost', 1);
+    if (sprite) ctx.drawImage(sprite, drawX, drawY);
+  }
+}
+
+class CoinMagnet {
+  constructor(x, y) {
+    this.type = 'coin_magnet';
+    this.x = x;
+    this.y = y;
+    this.w = 14;
+    this.h = 14;
+    this.vx = 1;
+    this.vy = 0;
+    this.onGround = false;
+    this.active = true;
+    this.collected = false;
+    this.spawnTimer = 0;
+    this.spawnY = y;
+    this.animTimer = 0;
+  }
+
+  update() {
+    if (!this.active || this.collected) return;
+    this.spawnTimer++;
+    if (this.spawnTimer < 16) {
+      this.y = this.spawnY - this.spawnTimer;
+      return;
+    }
+    this.x += this.vx;
+    this.animTimer++;
+  }
+
+  collect() {
+    this.collected = true;
+    this.active = false;
+  }
+
+  render(ctx, camera) {
+    if (!this.active || this.collected) return;
+    const drawX = Math.round(this.x - camera.x);
+    const drawY = Math.round(this.y - camera.y);
+    const sprite = renderSprite('coin_magnet', 1);
+    if (sprite) ctx.drawImage(sprite, drawX, drawY);
+  }
+}
+
+export { Enemy, Coin, Flag, FloatingText, Particle, Mushroom, StarPowerup, FireFlower, Fireball, SpeedBoost, CoinMagnet, createBrickParticles, createPowerupParticles };

@@ -8,6 +8,7 @@ import { initFirebase, signInWithGoogle, signOut, getUser, getLeaderboard, track
 import { audioManager } from './audio.js';
 import { voiceHelper } from './voice.js';
 import { isGeminiAvailable, chatWithCompanion } from './gemini.js';
+import { progressStorage } from './storage.js';
 
 class Dashboard {
   constructor() {
@@ -49,6 +50,18 @@ class Dashboard {
     this.highContrastToggle = document.getElementById('high-contrast-toggle');
     this.reducedMotionToggle = document.getElementById('reduced-motion-toggle');
     this.voiceToggle = document.getElementById('voice-toggle');
+    this.levelSelectBtn = document.getElementById('levelselect-btn');
+    this.levelSelectPanel = document.getElementById('levelselect-panel');
+    this.closeLevelSelect = document.getElementById('close-levelselect');
+    this.levelGrid = document.getElementById('level-grid');
+    this.multiplayerBtn = document.getElementById('multiplayer-btn');
+    this.multiplayerPanel = document.getElementById('multiplayer-panel');
+    this.closeMultiplayer = document.getElementById('close-multiplayer');
+    this.createRoomBtn = document.getElementById('create-room-btn');
+    this.joinRoomBtn = document.getElementById('join-room-btn');
+    this.joinCodeInput = document.getElementById('join-code-input');
+    this.lobbyStatus = document.getElementById('lobby-status');
+    this.lobbyContent = document.getElementById('lobby-content');
   }
 
   _bindEvents() {
@@ -67,6 +80,14 @@ class Dashboard {
 
     this.settingsBtn?.addEventListener('click', () => this._togglePanel('settings'));
     this.closeSettings?.addEventListener('click', () => this._closePanel('settings'));
+
+    this.levelSelectBtn?.addEventListener('click', () => this._togglePanel('levelselect'));
+    this.closeLevelSelect?.addEventListener('click', () => this._closePanel('levelselect'));
+
+    this.multiplayerBtn?.addEventListener('click', () => this._togglePanel('multiplayer'));
+    this.closeMultiplayer?.addEventListener('click', () => this._closePanel('multiplayer'));
+    this.createRoomBtn?.addEventListener('click', () => this._createRoom());
+    this.joinRoomBtn?.addEventListener('click', () => this._joinRoom());
 
     this.volumeSlider?.addEventListener('input', (e) => {
       audioManager.setVolume(Number(e.target.value) / 100);
@@ -117,9 +138,9 @@ class Dashboard {
     // Escape key closes any open panel
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const panels = ['companion', 'leaderboard', 'settings'];
+        const panels = ['companion', 'leaderboard', 'settings', 'levelselect', 'multiplayer'];
         for (const panel of panels) {
-          const el = { companion: this.companionPanel, leaderboard: this.leaderboardPanel, settings: this.settingsPanel }[panel];
+          const el = { companion: this.companionPanel, leaderboard: this.leaderboardPanel, settings: this.settingsPanel, levelselect: this.levelSelectPanel, multiplayer: this.multiplayerPanel }[panel];
           if (el && !el.hidden) {
             this._closePanel(panel);
             break;
@@ -194,6 +215,8 @@ class Dashboard {
       companion: this.companionPanel,
       leaderboard: this.leaderboardPanel,
       settings: this.settingsPanel,
+      levelselect: this.levelSelectPanel,
+      multiplayer: this.multiplayerPanel,
     };
     const el = panels[panel];
     if (!el) return;
@@ -212,6 +235,8 @@ class Dashboard {
       companion: this.companionBtn,
       leaderboard: this.leaderboardBtn,
       settings: this.settingsBtn,
+      levelselect: this.levelSelectBtn,
+      multiplayer: this.multiplayerBtn,
     };
     for (const [key, btn] of Object.entries(toggleBtns)) {
       if (btn) btn.setAttribute('aria-expanded', String(key === panel && !el.hidden));
@@ -222,6 +247,7 @@ class Dashboard {
       if (focusable) focusable.focus();
       if (panel === 'leaderboard') this._loadLeaderboard();
       if (panel === 'companion') this._checkCompanionAvailability();
+      if (panel === 'levelselect') this._loadLevelSelect();
     }
   }
 
@@ -230,11 +256,15 @@ class Dashboard {
       companion: this.companionPanel,
       leaderboard: this.leaderboardPanel,
       settings: this.settingsPanel,
+      levelselect: this.levelSelectPanel,
+      multiplayer: this.multiplayerPanel,
     };
     const btns = {
       companion: this.companionBtn,
       leaderboard: this.leaderboardBtn,
       settings: this.settingsBtn,
+      levelselect: this.levelSelectBtn,
+      multiplayer: this.multiplayerBtn,
     };
     const el = panels[panel];
     if (el) el.hidden = true;
@@ -282,6 +312,116 @@ class Dashboard {
     div.textContent = text;
     this.companionMessages.appendChild(div);
     this.companionMessages.scrollTop = this.companionMessages.scrollHeight;
+  }
+
+  _loadLevelSelect() {
+    if (!this.levelGrid) return;
+    const highest = progressStorage.highestLevel;
+    const maxShow = Math.max(highest + 1, 3);
+
+    this.levelGrid.innerHTML = '';
+    for (let i = 1; i <= maxShow; i++) {
+      const btn = document.createElement('button');
+      const locked = i > highest + 1;
+      const best = progressStorage.getBestScore(i);
+
+      btn.className = 'level-btn' + (locked ? ' level-locked' : '') + (best > 0 ? ' level-cleared' : '');
+      btn.setAttribute('aria-label', locked ? `Level ${i} - Locked` : `Level ${i}${best > 0 ? ' - Best: ' + best.toLocaleString() : ''}`);
+
+      if (locked) {
+        btn.innerHTML = `<span class="level-num">${i}</span><span class="level-lock">LOCKED</span>`;
+        btn.disabled = true;
+      } else {
+        btn.innerHTML = `<span class="level-num">${i}</span>${best > 0 ? `<span class="level-score">${best.toLocaleString()}</span>` : '<span class="level-score">---</span>'}`;
+        btn.addEventListener('click', () => {
+          audioManager.init();
+          audioManager.menuSelect();
+          window.location.href = `game.html?level=${i}`;
+        });
+      }
+
+      this.levelGrid.appendChild(btn);
+    }
+  }
+
+  async _createRoom() {
+    if (!window.io) {
+      if (this.lobbyStatus) this.lobbyStatus.textContent = 'Multiplayer not available.';
+      return;
+    }
+
+    if (this.lobbyStatus) this.lobbyStatus.textContent = 'Connecting...';
+
+    try {
+      const socket = window.io();
+      socket.on('connect', () => {
+        socket.emit('create-room', (response) => {
+          if (response.error) {
+            if (this.lobbyStatus) this.lobbyStatus.textContent = response.error;
+            return;
+          }
+
+          if (this.lobbyContent) {
+            this.lobbyContent.innerHTML = `
+              <p class="lobby-waiting">Share this code with a friend:</p>
+              <div class="lobby-room-code">${response.code}</div>
+              <p class="lobby-waiting">Waiting for opponent to join...</p>
+              <div id="lobby-status" class="lobby-status"></div>
+            `;
+          }
+
+          socket.on('player-joined', () => {
+            audioManager.init();
+            audioManager.menuSelect();
+            window.location.href = `game.html?mode=multiplayer&room=${response.code}`;
+          });
+        });
+      });
+
+      socket.on('connect_error', () => {
+        if (this.lobbyStatus) this.lobbyStatus.textContent = 'Connection failed.';
+      });
+    } catch (err) {
+      if (this.lobbyStatus) this.lobbyStatus.textContent = 'Connection failed.';
+    }
+  }
+
+  async _joinRoom() {
+    const code = this.joinCodeInput?.value?.trim().toUpperCase();
+    if (!code || code.length !== 4) {
+      if (this.lobbyStatus) this.lobbyStatus.textContent = 'Enter a 4-character code.';
+      return;
+    }
+
+    if (!window.io) {
+      if (this.lobbyStatus) this.lobbyStatus.textContent = 'Multiplayer not available.';
+      return;
+    }
+
+    if (this.lobbyStatus) this.lobbyStatus.textContent = 'Joining...';
+
+    try {
+      const socket = window.io();
+      socket.on('connect', () => {
+        socket.emit('join-room', code, (response) => {
+          if (response.error) {
+            if (this.lobbyStatus) this.lobbyStatus.textContent = response.error;
+            socket.disconnect();
+            return;
+          }
+
+          audioManager.init();
+          audioManager.menuSelect();
+          window.location.href = `game.html?mode=multiplayer&room=${response.code}`;
+        });
+      });
+
+      socket.on('connect_error', () => {
+        if (this.lobbyStatus) this.lobbyStatus.textContent = 'Connection failed.';
+      });
+    } catch (err) {
+      if (this.lobbyStatus) this.lobbyStatus.textContent = 'Connection failed.';
+    }
   }
 }
 

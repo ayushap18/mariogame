@@ -34,6 +34,9 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <!-- Socket.io Client -->
+  <script defer src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <!-- Skip Navigation Link -->
@@ -78,6 +81,12 @@
       </button>
       <button id="settings-btn" class="menu-btn btn-settings" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
         &#9881; SETTINGS
+      </button>
+      <button id="levelselect-btn" class="menu-btn btn-levelselect" aria-label="Open level select" aria-expanded="false" aria-controls="levelselect-panel">
+        &#127903; LEVEL SELECT
+      </button>
+      <button id="multiplayer-btn" class="menu-btn btn-multiplayer pixel-border" aria-label="Play online multiplayer" aria-expanded="false" aria-controls="multiplayer-panel">
+        &#127760; ONLINE PLAY
       </button>
     </nav>
 
@@ -149,6 +158,31 @@
           <dt>Jump</dt><dd>Up / W / Space</dd>
           <dt>Pause</dt><dd>ESC or P</dd>
         </dl>
+      </div>
+    </section>
+
+    <!-- Level Select Panel -->
+    <section id="levelselect-panel" class="panel" hidden role="dialog" aria-labelledby="ls-title">
+      <button id="close-levelselect" class="panel-close" aria-label="Close level select">&#10005;</button>
+      <h2 id="ls-title">LEVEL SELECT</h2>
+      <div id="level-grid" class="level-grid" role="grid" aria-label="Select a level"></div>
+    </section>
+
+    <!-- Multiplayer Lobby Panel -->
+    <section id="multiplayer-panel" class="panel" hidden role="dialog" aria-labelledby="mp-title">
+      <button id="close-multiplayer" class="panel-close" aria-label="Close multiplayer lobby">&#10005;</button>
+      <h2 id="mp-title">ONLINE PLAY</h2>
+      <div id="lobby-content" class="lobby-content">
+        <div class="lobby-actions">
+          <button id="create-room-btn" class="menu-btn btn-play" aria-label="Create a new room">CREATE ROOM</button>
+          <div class="lobby-divider">- OR -</div>
+          <div class="lobby-join">
+            <label for="join-code-input" class="sr-only">Enter room code</label>
+            <input id="join-code-input" type="text" maxlength="4" placeholder="CODE" class="lobby-code-input" autocomplete="off">
+            <button id="join-room-btn" class="menu-btn btn-ai" aria-label="Join room with code">JOIN</button>
+          </div>
+        </div>
+        <div id="lobby-status" class="lobby-status" aria-live="polite"></div>
       </div>
     </section>
 

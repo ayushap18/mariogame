@@ -11,9 +11,12 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 import express from 'express';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { setupMultiplayer } from './multiplayer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -346,7 +349,15 @@ app.get('*', (req, res) => {
 
 // --- Start Server ---
 initGemini();
-app.listen(PORT, () => {
+
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer);
+setupMultiplayer(io);
+
+httpServer.listen(PORT, () => {
   console.log(`MARIO.AI server running on port ${PORT}`);
   console.log(`Gemini AI: ${geminiModel ? 'enabled' : 'disabled (set GEMINI_API_KEY)'}`);
+  console.log('Multiplayer: enabled (Socket.io)');
 });
+
+export { app, httpServer };

@@ -17,7 +17,7 @@ class InputManager {
     this._bound = true;
 
     const onKeyDown = (e) => {
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Escape', 'p', 'P', 'Enter'].includes(e.key)) {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Escape', 'p', 'P', 'Enter', 'x', 'X', 'z', 'Z'].includes(e.key)) {
         e.preventDefault();
       }
       if (!this.keys[e.key]) {
@@ -77,6 +77,7 @@ class InputManager {
   get left() { return this.isDown('ArrowLeft') || this.isDown('a') || this.isDown('A'); }
   get right() { return this.isDown('ArrowRight') || this.isDown('d') || this.isDown('D'); }
   get jump() { return this.isDown('ArrowUp') || this.isDown('w') || this.isDown('W') || this.isDown(' '); }
+  get fire() { return this.isJustPressed('x') || this.isJustPressed('X') || this.isJustPressed('z') || this.isJustPressed('Z'); }
   get pause() { return this.isJustPressed('Escape') || this.isJustPressed('p') || this.isJustPressed('P'); }
 
   clearJustPressed() {

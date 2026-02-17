@@ -29,6 +29,8 @@ class Player {
     this.deathTimer = 0;
     this.finished = false;
     this.starPower = false;
+    this.hasFirePower = false;
+    this.speedMultiplier = 1;
     this._headHitCallbacks = [];
   }
 
@@ -54,10 +56,10 @@ class Player {
     if (this.invincibleTimer > 0) this.invincibleTimer--;
 
     if (input.left) {
-      this.vx = -MOVE_SPEED;
+      this.vx = -MOVE_SPEED * this.speedMultiplier;
       this.facing = -1;
     } else if (input.right) {
-      this.vx = MOVE_SPEED;
+      this.vx = MOVE_SPEED * this.speedMultiplier;
       this.facing = 1;
     } else {
       this.vx *= FRICTION;

@@ -34,6 +34,9 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <!-- Socket.io Client -->
+  <script defer src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <!-- Skip Navigation -->
@@ -117,6 +120,7 @@
     import { voiceHelper } from './static/js/voice.js';
     import { initFirebase, trackPageView } from './static/js/services.js';
     import { isGeminiAvailable, buildContext, getGameTip } from './static/js/gemini.js';
+    import { MultiplayerClient } from './static/js/multiplayer-client.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
       initFirebase();
@@ -126,13 +130,34 @@
       const params = new URLSearchParams(window.location.search);
       const aiMode = params.get('mode') === 'ai';
       const timeAttack = params.get('mode') === 'timeattack';
+      const multiplayerMode = params.get('mode') === 'multiplayer';
+      const roomCode = params.get('room');
+      const startLevel = parseInt(params.get('level'), 10) || 0;
 
       if (aiMode) {
         const aiWrapper = document.getElementById('ai-score-wrapper');
         if (aiWrapper) aiWrapper.hidden = false;
       }
 
-      const game = new Game(canvas, { aiMode, timeAttack });
+      let multiplayerClient = null;
+      if (multiplayerMode && roomCode && window.io) {
+        multiplayerClient = new MultiplayerClient();
+        try {
+          await multiplayerClient.connect();
+          await multiplayerClient.joinRoom(roomCode);
+        } catch (err) {
+          console.warn('Multiplayer connection failed:', err.message);
+          multiplayerClient = null;
+        }
+      }
+
+      const game = new Game(canvas, {
+        aiMode,
+        timeAttack,
+        startLevel: startLevel > 0 ? startLevel - 1 : 0,
+        multiplayerMode: !!multiplayerClient,
+        multiplayerClient,
+      });
 
       const announcer = document.getElementById('game-announcements');
       game.setAnnouncer(announcer);
